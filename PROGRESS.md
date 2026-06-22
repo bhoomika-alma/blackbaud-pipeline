@@ -15,7 +15,7 @@ Tasks are taken top-to-bottom, one per iteration. See `BUILD_SPEC.md` for the fu
 
 ## Phase 2 — Shared backend modules
 - [x] Env/config loader (validate required vars; clear errors). — `functions/_shared/env.ts`: `getConfig()` validates SUPABASE_URL/SERVICE_ROLE_KEY/HUBSPOT_TOKEN (throws clear error if missing), optional bucket + 4 pipeline IDs with defaults, `blackbaudPipelineIds()` helper. 4 unit tests (env.test.ts). deno check/lint/fmt/test all clean.
-- [ ] Cleaning module (cleanDomain, splitName, demonstrateStageDate, derivePipeline, buildDealName) + BB_PIPELINES constant. Unit-tested.
+- [x] Cleaning module (cleanDomain, splitName, demonstrateStageDate, derivePipeline, buildDealName) + BB_PIPELINES constant. Unit-tested. — `functions/_shared/clean.ts`: Phase B rules incl. subdomain strip+flag with 2-part ccTLD exceptions, ACTIVE_STAGES + pipelineKeyForName helpers. 14 unit tests (clean.test.ts) covering all rules + edge cases; 18 backend tests pass total. deno check/lint/fmt/test clean.
 - [ ] HubSpot client (searchDealsByBbid batch, searchDealsByName, batchUpdateDeals idProperty=unique_bb_id, upsertCompany/Contact/Deal, createAssociations). Mockable.
 
 ## Phase 3 — Edge Functions
