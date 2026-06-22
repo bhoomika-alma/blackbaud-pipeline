@@ -10,7 +10,7 @@ Tasks are taken top-to-bottom, one per iteration. See `BUILD_SPEC.md` for the fu
 - [x] Init `/supabase` (config.toml, functions/, migrations/). — `config.toml` (api/db/storage, auth disabled, private `bb-uploads` bucket, edge_runtime), `functions/deno.json` (imports map for std + supabase-js, lint/fmt/test tasks), empty `migrations/`. config.toml parses as valid TOML; `deno fmt --check` clean. (deno lint reports "no targets" until functions exist in Phase 3.)
 
 ## Phase 1 — Database & storage
-- [ ] SQL migration: enums + import_runs + deal_rows (per schema) + FK + indexes.
+- [x] SQL migration: enums + import_runs + deal_rows (per schema) + FK + indexes. — `20260622000000_init_schema.sql`: 6 enums (import_status, review_status, deal_classification, matched_by, review_decision, import_action), both tables with all spec columns, FK deal_rows→import_runs (on delete cascade), 3 indexes (bb_id, deal_name, import_run_id), updated_at trigger. RLS left disabled (no-auth design, documented). DDL parse-validated with pgsql-ast-parser.
 - [ ] Create private Storage bucket `bb-uploads`.
 
 ## Phase 2 — Shared backend modules
