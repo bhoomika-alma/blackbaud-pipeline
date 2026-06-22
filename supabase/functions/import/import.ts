@@ -77,6 +77,12 @@ function pipelineIdFor(
   return key ? pipelineIds[key] : undefined;
 }
 
+// Only these deal properties exist in HubSpot, so these are all we ever send.
+// region/vertical have no HubSpot deal property (bb_region / bb_vertical do not
+// exist), and there is no separate last_stage_change_date property — that signal
+// is folded into demonstrate_stage_date. We never create properties; we only
+// write to ones that already exist.
+
 /** NEW-create deal properties — INCLUDES the ARR amount. */
 export function buildCreateDealProperties(
   row: ImportRow,
@@ -89,8 +95,6 @@ export function buildCreateDealProperties(
   setProp(props, "amount", finalArr(row));
   setProp(props, "closedate", row.close_date);
   setProp(props, "demonstrate_stage_date", row.demonstrate_stage_date);
-  setProp(props, "bb_region", row.region);
-  setProp(props, "bb_vertical", row.vertical);
   return props;
 }
 
@@ -102,9 +106,6 @@ export function buildUpdateProperties(row: ImportRow): Record<string, string> {
   const props: Record<string, string> = {};
   setProp(props, "closedate", row.close_date);
   setProp(props, "demonstrate_stage_date", row.demonstrate_stage_date);
-  setProp(props, "last_stage_change_date", row.last_stage_change_date);
-  setProp(props, "bb_region", row.region);
-  setProp(props, "bb_vertical", row.vertical);
   return props;
 }
 

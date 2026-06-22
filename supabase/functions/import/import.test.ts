@@ -85,21 +85,26 @@ Deno.test("cleanAmount strips currency formatting", () => {
   assertEquals(cleanAmount(null), "");
 });
 
-Deno.test("buildUpdateProperties omits amount, dealname, and pipeline", () => {
+Deno.test("buildUpdateProperties only sends properties that exist in HubSpot", () => {
   const props = buildUpdateProperties(makeRow({
     deal_name: "Acme - Blackbaud Canada",
     arr_final: 9999,
     close_date: "2026-06-30",
     region: "Canada",
     vertical: "HigherEd",
+    demonstrate_stage_date: "2026-03-15",
     last_stage_change_date: "2026-03-15",
   }));
+  // never overwrite / not real HubSpot deal properties
   assertEquals("amount" in props, false);
   assertEquals("dealname" in props, false);
   assertEquals("pipeline" in props, false);
+  assertEquals("bb_region" in props, false);
+  assertEquals("bb_vertical" in props, false);
+  assertEquals("last_stage_change_date" in props, false);
+  // real properties we do write
   assertEquals(props.closedate, "2026-06-30");
-  assertEquals(props.bb_region, "Canada");
-  assertEquals(props.last_stage_change_date, "2026-03-15");
+  assertEquals(props.demonstrate_stage_date, "2026-03-15");
 });
 
 Deno.test("buildCreateDealProperties includes amount + pipeline + unique_bb_id", () => {
@@ -116,6 +121,9 @@ Deno.test("buildCreateDealProperties includes amount + pipeline + unique_bb_id",
   assertEquals(props.dealname, "Acme - Blackbaud Canada");
   assertEquals(props.pipeline, "36496197");
   assertEquals(props.amount, "50000");
+  // bb_region / bb_vertical do not exist in HubSpot — never sent.
+  assertEquals("bb_region" in props, false);
+  assertEquals("bb_vertical" in props, false);
 });
 
 Deno.test("buildCreateDealProperties prefers arr_final over arr_raw", () => {
