@@ -1,0 +1,16 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+
+# Environment files (keep examples)
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+
+# Supabase
+supabase/.temp
