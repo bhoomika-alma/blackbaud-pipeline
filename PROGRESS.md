@@ -11,7 +11,7 @@ Tasks are taken top-to-bottom, one per iteration. See `BUILD_SPEC.md` for the fu
 
 ## Phase 1 — Database & storage
 - [x] SQL migration: enums + import_runs + deal_rows (per schema) + FK + indexes. — `20260622000000_init_schema.sql`: 6 enums (import_status, review_status, deal_classification, matched_by, review_decision, import_action), both tables with all spec columns, FK deal_rows→import_runs (on delete cascade), 3 indexes (bb_id, deal_name, import_run_id), updated_at trigger. RLS left disabled (no-auth design, documented). DDL parse-validated with pgsql-ast-parser.
-- [ ] Create private Storage bucket `bb-uploads`.
+- [x] Create private Storage bucket `bb-uploads`. — declared in config.toml (local) + idempotent migration `20260622000100_storage_bucket.sql` (insert into storage.buckets, public=false) with anon insert/select policies for the no-auth upload flow. Insert stmt parse-validated; policy syntax hand-verified (standard PG RLS).
 
 ## Phase 2 — Shared backend modules
 - [ ] Env/config loader (validate required vars; clear errors).
