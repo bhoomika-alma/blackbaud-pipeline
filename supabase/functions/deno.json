@@ -1,0 +1,23 @@
+{
+  "imports": {
+    "std/": "https://deno.land/std@0.224.0/",
+    "@supabase/supabase-js": "jsr:@supabase/supabase-js@^2.45.4"
+  },
+  "lint": {
+    "rules": {
+      "tags": ["recommended"]
+    }
+  },
+  "fmt": {
+    "semiColons": true,
+    "singleQuote": false,
+    "lineWidth": 100,
+    "indentWidth": 2
+  },
+  "tasks": {
+    "check": "deno check **/*.ts",
+    "lint": "deno lint",
+    "fmt:check": "deno fmt --check",
+    "test": "deno test --allow-env --allow-net"
+  }
+}

@@ -7,7 +7,7 @@ Tasks are taken top-to-bottom, one per iteration. See `BUILD_SPEC.md` for the fu
 ## Phase 0 — Scaffold
 - [x] Repo layout `/frontend` + `/supabase`; root README; root `.env.example` + `frontend/.env.example` documenting every variable with a description. — created dirs (.gitkeep), root README (architecture/setup/secrets), root `.env.example` (SUPABASE_URL, SERVICE_ROLE_KEY, HUBSPOT_TOKEN, bucket, 4 pipeline IDs), `frontend/.env.example` (VITE_* only).
 - [x] Init `/frontend` (Vite + React + TS) + Supabase JS client + router for the 5 screens. — Vite 5 + React 18 + TS scaffold (manual, eslint flat config), `src/lib/env.ts` (throws on missing VITE_ vars) + `src/lib/supabase.ts` client, react-router with routes for all 5 screens. typecheck+lint+build all clean.
-- [ ] Init `/supabase` (config.toml, functions/, migrations/).
+- [x] Init `/supabase` (config.toml, functions/, migrations/). — `config.toml` (api/db/storage, auth disabled, private `bb-uploads` bucket, edge_runtime), `functions/deno.json` (imports map for std + supabase-js, lint/fmt/test tasks), empty `migrations/`. config.toml parses as valid TOML; `deno fmt --check` clean. (deno lint reports "no targets" until functions exist in Phase 3.)
 
 ## Phase 1 — Database & storage
 - [ ] SQL migration: enums + import_runs + deal_rows (per schema) + FK + indexes.
