@@ -26,7 +26,7 @@ Tasks are taken top-to-bottom, one per iteration. See `BUILD_SPEC.md` for the fu
 ## Phase 4 — Frontend
 - [x] Screen 1 Upload (→ Storage → trigger ingest+classify). — `frontend/src/lib/{api.ts,types.ts}` (Storage upload + Edge Function invoke via anon key; shared run/row types) + `UploadPage.tsx`: email (no-auth, prefilled from localStorage) + source label + CSV → upload to bb-uploads → ingest → classify → navigate to /results/:runId, with per-phase status + error handling. typecheck/lint/build clean.
 - [x] Screen 2 Results dashboard + Approved? gate. — `ResultsPage.tsx`: loads run + rows (added `getRun`/`getRows`/review-update helpers to api.ts), per-bucket count cards (new/existing/review/hold/internal + total), and the Approved? gate — edge cases → Review (with skip-anyway), none → Approve & import. typecheck/lint/build clean.
-- [ ] Screen 3 Review (the 7 edge cases; edit ARR/domain; decisions; approve).
+- [x] Screen 3 Review (the 7 edge cases; edit ARR/domain; decisions; approve). — `ReviewPage.tsx`: loads run edge_cases, one editable card per affected row (labels for all 7 categories, decision select approve/confirm/skip/reject, ARR + domain inputs with sensible defaults), reviewer email + notes; on approve persists each row's review fields (incl. linked_hs_deal_id on confirm) + run review_status, then routes to import. typecheck/lint/build clean.
 - [ ] Screens 4+5 Import + Summary.
 
 ## Phase 5 — Wire-up & verify
