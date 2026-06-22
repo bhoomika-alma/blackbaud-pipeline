@@ -18,6 +18,6 @@
     "check": "deno check **/*.ts",
     "lint": "deno lint",
     "fmt:check": "deno fmt --check",
-    "test": "deno test --allow-env --allow-net"
+    "test": "deno test --allow-env --allow-net --allow-read"
   }
 }

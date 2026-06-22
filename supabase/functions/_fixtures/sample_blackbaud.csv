@@ -1,0 +1,8 @@
+Unique BB ID,Account Name,Contact Name,Contact Email,Website,Stage,Region,Vertical,ARR,Created Date,Close Date,Last Stage Change Date
+BB1001,University of Windsor,Jane Doe,jane@uwindsor.ca,https://www.uwindsor.ca/,Demonstrate,Canada,HigherEd,50000,2026-01-05,2026-06-30,2026-03-15
+BB1002,Acme Academy,John Smith,john@acmeacademy.org,http://www.acmeacademy.org/admissions,Propose,US,K12,18000,1/10/2026,9/30/2026,2/20/2026
+BB1003,Broward College,Maria Lopez,maria@mail.broward.edu,mail.broward.edu,Negotiate,US,HigherEd,42000,2026-02-01,2026-08-15,2026-04-01
+BB1004,Oxford Trust,Alan Turing,alan@oxfordtrust.ac.uk,https://oxfordtrust.ac.uk,Discover,England,HigherEd,,2026-03-01,2026-12-01,2026-03-02
+BB1005,Sao Paulo School,Carlos Silva,carlos@spschool.com,www.spschool.com,Engage,LatAm,K12,15000,2026-03-05,2026-10-10,2026-03-06
+BB1006,Greenfield Prep,"O'Neil, Erin",erin@greenfield.co.uk,https://www.greenfield.co.uk/,Propose,England,K12,22000,2026-01-20,2026-07-07,2026-05-05
+BB1007,Madison University,,,madison.edu,Demonstrate,US,HigherEd,75000,2026-02-15,2026-09-01,2026-04-20

@@ -30,7 +30,7 @@ Tasks are taken top-to-bottom, one per iteration. See `BUILD_SPEC.md` for the fu
 - [x] Screens 4+5 Import + Summary. — `ImportPage.tsx`: shows to-create/to-update/reviewed counts, triggers the import edge function (guards already-completed runs), routes to summary. `SummaryPage.tsx`: created/updated/skipped/errors cards, duplicate-company merge flags, error list, per-row results table (action + HubSpot deal id + error), link to start a new import. typecheck/lint/build clean.
 
 ## Phase 5 — Wire-up & verify
-- [ ] Sample CSV fixture; unit tests for cleaning + classification with mocked HTTP; typecheck/build both apps.
+- [x] Sample CSV fixture; unit tests for cleaning + classification with mocked HTTP; typecheck/build both apps. — `_fixtures/sample_blackbaud.csv` (7 diverse rows) + `_shared/fixture.test.ts` (end-to-end parse→clean→classify with mocked HubSpot results); added --allow-read to test task. Verified: 66 backend tests pass, deno check all entrypoints, frontend typecheck+lint+build all clean.
 - [ ] Finalize README (setup, where to put secrets) + both `.env.example` files.
 
 ## Notes
