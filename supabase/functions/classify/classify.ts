@@ -83,13 +83,15 @@ export function classifyRow(
 
   const matches = nameMatches ?? [];
   if (matches.length === 0) {
+    // A brand-new deal is NOT an edge case — ARR is confirmed in the full
+    // "review rows before inserting" grid, not in the edge-case queue.
     return {
       classification: "new",
       matched_by: "none",
       hs_deal_id: null,
       matched_pipeline: null,
       match_count: 0,
-      edgeCase: { kind: "new_arr", category: 1, detail: "New deal — confirm the ARR amount" },
+      edgeCase: null,
     };
   }
   if (matches.length === 1) {

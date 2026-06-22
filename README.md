@@ -65,8 +65,9 @@ Two tables (see [supabase/migrations](supabase/migrations)):
 All configuration is via **environment variables** — nothing is hardcoded.
 
 - **Backend** (Edge Functions): copy `.env.example` → `.env` at the repo root and fill it in.
-  For deployed functions set the same vars as Supabase secrets:
-  `supabase secrets set --env-file ./.env`.
+  For deployed functions, `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are provided
+  by Supabase automatically; set only the app-specific vars as project secrets:
+  `HUBSPOT_TOKEN`, `BB_UPLOADS_BUCKET`, and any `HUBSPOT_PIPELINE_*` overrides.
 - **Frontend**: copy `frontend/.env.example` → `frontend/.env`. Only `VITE_`-prefixed
   vars are exposed to the browser — **never** put the service-role key or HubSpot
   token here.
@@ -93,7 +94,7 @@ supabase functions serve            # serve ingest / classify / import
 ### Deploy
 ```bash
 supabase db push                            # apply migrations to the linked project
-supabase secrets set --env-file ./.env      # push backend env to function secrets
+supabase secrets set HUBSPOT_TOKEN=... BB_UPLOADS_BUCKET=bb-uploads
 supabase functions deploy ingest classify import
 cd frontend && npm run build                # static SPA in frontend/dist
 ```

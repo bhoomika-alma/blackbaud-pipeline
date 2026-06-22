@@ -55,7 +55,7 @@ Deno.test("classifyRow: no bb_id match + inactive stage → HOLD", () => {
   assertEquals(result.edgeCase, null);
 });
 
-Deno.test("classifyRow: active stage, 0 name matches → NEW (+ ARR edge case)", () => {
+Deno.test("classifyRow: active stage, 0 name matches → NEW (not an edge case)", () => {
   const result = classifyRow(
     row({ stage: "Demonstrate", deal_name: "Acme - X" }),
     [],
@@ -63,7 +63,7 @@ Deno.test("classifyRow: active stage, 0 name matches → NEW (+ ARR edge case)",
     BB_PIPELINES,
   );
   assertEquals(result.classification, "new");
-  assertEquals(result.edgeCase?.category, 1);
+  assertEquals(result.edgeCase, null);
 });
 
 Deno.test("classifyRow: active stage, 1 name match → REVIEW (matched_by deal_name)", () => {
@@ -174,10 +174,10 @@ Deno.test("runClassify: domain_flagged adds a data-quality edge case", async () 
     importRunId: "run-1",
     blackbaudPipelineIds: BB_PIPELINES,
   });
-  // NEW (ARR edge) + domain_flag edge
-  assertEquals(result.edgeCaseCount, 2);
+  // NEW is no longer an edge case; only the domain_flag (category 7) remains.
+  assertEquals(result.edgeCaseCount, 1);
   const edges = captured.runUpdates.at(-1)?.edge_cases as { category: number }[];
-  assertEquals(edges.map((e) => e.category).sort(), [1, 7]);
+  assertEquals(edges.map((e) => e.category), [7]);
 });
 
 Deno.test("runClassify: caches name searches for duplicate deal names", async () => {

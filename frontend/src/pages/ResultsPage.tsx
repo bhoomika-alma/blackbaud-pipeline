@@ -46,8 +46,8 @@ export default function ResultsPage() {
   if (error) return <p className="error">{error}</p>
   if (!run) return <p className="error">Import run not found.</p>
 
-  const edgeCases = run.edge_cases ?? []
-  const hasEdgeCases = edgeCases.length > 0
+  // Category 1 ("new deal → confirm ARR") is routine, not a real edge case.
+  const realEdgeCount = (run.edge_cases ?? []).filter((e) => e.category !== 1).length
 
   return (
     <section>
@@ -73,22 +73,28 @@ export default function ResultsPage() {
       </div>
 
       <div className="gate">
-        {hasEdgeCases ? (
-          <>
-            <p className="status">{edgeCases.length} item(s) need review before import.</p>
-            <div className="gate__actions">
-              <button onClick={() => navigate(`/review/${runId}`)}>Review edge cases →</button>
-              <button className="secondary" onClick={() => navigate(`/import/${runId}`)}>
-                Skip review &amp; import anyway
-              </button>
-            </div>
-          </>
+        {realEdgeCount > 0 ? (
+          <p className="status">
+            {realEdgeCount} edge case{realEdgeCount === 1 ? '' : 's'} need a decision before import.
+          </p>
         ) : (
-          <>
-            <p className="status">No edge cases — ready to import.</p>
-            <button onClick={() => navigate(`/import/${runId}`)}>Approve &amp; import →</button>
-          </>
+          <p className="status">No edge cases flagged — review the rows, or import directly.</p>
         )}
+        <div className="gate__actions">
+          {realEdgeCount > 0 && (
+            <button className="danger" onClick={() => navigate(`/review/${runId}?mode=edge`)}>
+              Review {realEdgeCount} edge case{realEdgeCount === 1 ? '' : 's'} →
+            </button>
+          )}
+          <button onClick={() => navigate(`/review/${runId}?mode=all`)}>
+            Review rows before inserting →
+          </button>
+          {realEdgeCount === 0 && (
+            <button className="secondary" onClick={() => navigate(`/import/${runId}`)}>
+              Approve &amp; import →
+            </button>
+          )}
+        </div>
       </div>
     </section>
   )

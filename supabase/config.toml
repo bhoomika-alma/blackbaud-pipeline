@@ -12,7 +12,7 @@ max_rows = 1000
 [db]
 port = 54322
 shadow_port = 54320
-major_version = 15
+major_version = 17
 
 [studio]
 enabled = true
@@ -34,8 +34,11 @@ file_size_limit = "50MiB"
 allowed_mime_types = ["text/csv", "application/vnd.ms-excel", "text/plain"]
 
 [auth]
-# No auth layer in this app — uploader/reviewer email is captured as plain text.
-enabled = false
+# This app has no login UI — uploader/reviewer email is captured as plain text.
+# The Auth service stays enabled so the anon/service_role keys are issued and
+# shown by the CLI, and so supabase-js initializes cleanly. We simply never call
+# any sign-in methods.
+enabled = true
 
 [edge_runtime]
 enabled = true

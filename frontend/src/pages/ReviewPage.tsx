@@ -1,25 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { getRows, getRun, updateRowReview, updateRunReview } from '../lib/api'
 import type { DealRow, EdgeCaseEntry, ImportRun, ReviewDecision } from '../lib/types'
 
-// The 7 Phase E edge-case categories.
-const CATEGORY_LABEL: Record<number, string> = {
-  1: 'New deal — confirm the ARR amount',
-  2: '1 deal-name match, no BB ID — confirm',
-  3: '2+ deal-name matches — ambiguous',
-  4: 'Duplicate deal for the same BB ID',
-  5: 'ABM vs Blackbaud source conflict',
-  6: 'Already won / onboarding / in CS',
-  7: 'Data-quality: suspect domain',
-}
-
 const DECISIONS: { value: ReviewDecision; label: string }[] = [
-  { value: 'approve', label: 'Approve (create / update as classified)' },
-  { value: 'confirm', label: 'Confirm existing match (update)' },
-  { value: 'skip', label: 'Skip this row' },
+  { value: 'approve', label: 'Approve' },
+  { value: 'confirm', label: 'Confirm match' },
+  { value: 'skip', label: 'Skip' },
   { value: 'reject', label: 'Reject' },
 ]
+
+// Category 1 ("new deal → confirm ARR") is routine, not a real edge case.
+const isRealEdge = (e: EdgeCaseEntry) => e.category !== 1
 
 interface RowEdit {
   decision: ReviewDecision
@@ -42,7 +34,10 @@ function defaultDecision(row: DealRow): ReviewDecision {
 
 export default function ReviewPage() {
   const { runId } = useParams()
+  const [searchParams] = useSearchParams()
+  const mode = searchParams.get('mode') === 'all' ? 'all' : 'edge'
   const navigate = useNavigate()
+
   const [run, setRun] = useState<ImportRun | null>(null)
   const [rows, setRows] = useState<DealRow[]>([])
   const [edits, setEdits] = useState<Record<string, RowEdit>>({})
@@ -79,7 +74,7 @@ export default function ReviewPage() {
 
   const edgesByRow = useMemo(() => {
     const map = new Map<string, EdgeCaseEntry[]>()
-    for (const edge of run?.edge_cases ?? []) {
+    for (const edge of (run?.edge_cases ?? []).filter(isRealEdge)) {
       const list = map.get(edge.row_id) ?? []
       list.push(edge)
       map.set(edge.row_id, list)
@@ -87,7 +82,10 @@ export default function ReviewPage() {
     return map
   }, [run])
 
-  const reviewRows = useMemo(() => rows.filter((r) => edgesByRow.has(r.id)), [rows, edgesByRow])
+  const displayRows = useMemo(
+    () => (mode === 'all' ? rows : rows.filter((r) => edgesByRow.has(r.id))),
+    [mode, rows, edgesByRow],
+  )
 
   function patchEdit(rowId: string, patch: Partial<RowEdit>) {
     setEdits((prev) => ({ ...prev, [rowId]: { ...prev[rowId], ...patch } }))
@@ -98,7 +96,7 @@ export default function ReviewPage() {
     setError(null)
     setSaving(true)
     try {
-      for (const row of reviewRows) {
+      for (const row of displayRows) {
         const edit = edits[row.id]
         if (!edit) continue
         const arrNum = edit.arr.trim() === '' ? null : Number(edit.arr.replace(/[^0-9.]/g, ''))
@@ -126,79 +124,117 @@ export default function ReviewPage() {
   if (error && !run) return <p className="error">{error}</p>
   if (!run) return <p className="error">Import run not found.</p>
 
-  if (reviewRows.length === 0) {
+  if (mode === 'edge' && displayRows.length === 0) {
     return (
       <section>
-        <h2>Screen 3 — Review</h2>
-        <p className="status">No edge cases to review.</p>
-        <button onClick={() => navigate(`/import/${runId}`)}>Continue to import →</button>
+        <h2>Screen 3 — Review edge cases</h2>
+        <p className="status">🎉 No edge cases to resolve.</p>
+        <div className="gate__actions">
+          <button onClick={() => navigate(`/review/${runId}?mode=all`)}>
+            Review all rows before inserting →
+          </button>
+          <button className="secondary" onClick={() => navigate(`/import/${runId}`)}>
+            Approve &amp; import →
+          </button>
+        </div>
       </section>
     )
   }
 
+  const title = mode === 'all'
+    ? `Screen 3 — Review all ${displayRows.length} rows`
+    : `Screen 3 — Review ${displayRows.length} edge case${displayRows.length === 1 ? '' : 's'}`
+
   return (
     <section>
-      <h2>Screen 3 — Review {reviewRows.length} edge case(s)</h2>
-      <p className="muted">Edit ARR / domain, set a decision per row, then approve to continue.</p>
+      <h2>{title}</h2>
+      <p className="muted">
+        {mode === 'all'
+          ? 'Every row in the file. Edit ARR / domain and set a decision per row, then approve.'
+          : 'Only rows that need a human decision. Edit ARR / domain, set a decision, then approve.'}{' '}
+        {mode === 'edge' ? (
+          <a href={`#/review/${runId}?mode=all`} onClick={(e) => { e.preventDefault(); navigate(`/review/${runId}?mode=all`) }}>
+            View all rows →
+          </a>
+        ) : (
+          <a href={`#/review/${runId}?mode=edge`} onClick={(e) => { e.preventDefault(); navigate(`/review/${runId}?mode=edge`) }}>
+            View edge cases only →
+          </a>
+        )}
+      </p>
 
-      <div className="review-list">
-        {reviewRows.map((row) => {
-          const edit = edits[row.id]
-          const edges = edgesByRow.get(row.id) ?? []
-          if (!edit) return null
-          return (
-            <div className="review-row" key={row.id}>
-              <div className="review-row__head">
-                <strong>#{row.row_number} · {row.account_name ?? '(no account)'}</strong>
-                <span className="badge">{row.classification}</span>
-              </div>
-              <div className="muted">{row.deal_name}</div>
-              <ul className="review-row__edges">
-                {edges.map((e, i) => (
-                  <li key={i}>
-                    <strong>{CATEGORY_LABEL[e.category] ?? e.kind}:</strong> {e.detail}
-                  </li>
-                ))}
-              </ul>
-              <div className="fields-row">
-                <label className="field">
-                  <span>Decision</span>
-                  <select
-                    value={edit.decision}
-                    onChange={(ev) => patchEdit(row.id, { decision: ev.target.value as ReviewDecision })}
-                    disabled={saving}
-                  >
-                    {DECISIONS.map((d) => (
-                      <option key={d.value} value={d.value}>
-                        {d.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="field">
-                  <span>ARR amount</span>
-                  <input
-                    type="text"
-                    value={edit.arr}
-                    placeholder="e.g. 50000"
-                    onChange={(ev) => patchEdit(row.id, { arr: ev.target.value })}
-                    disabled={saving}
-                  />
-                </label>
-                <label className="field">
-                  <span>Domain</span>
-                  <input
-                    type="text"
-                    value={edit.domain}
-                    placeholder="example.com"
-                    onChange={(ev) => patchEdit(row.id, { domain: ev.target.value })}
-                    disabled={saving}
-                  />
-                </label>
-              </div>
-            </div>
-          )
-        })}
+      <div className="grid-wrap">
+        <table className="grid">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>BB ID</th>
+              <th>Account</th>
+              <th>Deal name</th>
+              <th>Pipeline</th>
+              <th>Region</th>
+              <th>Stage</th>
+              <th>Class</th>
+              <th>Domain</th>
+              <th>ARR</th>
+              <th>Decision</th>
+              <th>Edge case</th>
+            </tr>
+          </thead>
+          <tbody>
+            {displayRows.map((row) => {
+              const edit = edits[row.id]
+              if (!edit) return null
+              const edges = edgesByRow.get(row.id) ?? []
+              return (
+                <tr key={row.id} className={edges.length ? 'grid__flagged' : ''}>
+                  <td className="grid__num">{row.row_number}</td>
+                  <td>{row.bb_id ?? ''}</td>
+                  <td>{row.account_name ?? ''}</td>
+                  <td>{row.deal_name ?? ''}</td>
+                  <td>{row.derived_pipeline ?? ''}</td>
+                  <td>{row.region ?? ''}</td>
+                  <td>{row.stage ?? ''}</td>
+                  <td>
+                    <span className="badge">{row.classification}</span>
+                  </td>
+                  <td>
+                    <input
+                      className="grid__input"
+                      value={edit.domain}
+                      onChange={(e) => patchEdit(row.id, { domain: e.target.value })}
+                      disabled={saving}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      className="grid__input grid__input--num"
+                      value={edit.arr}
+                      onChange={(e) => patchEdit(row.id, { arr: e.target.value })}
+                      disabled={saving}
+                    />
+                  </td>
+                  <td>
+                    <select
+                      className="grid__input"
+                      value={edit.decision}
+                      onChange={(e) =>
+                        patchEdit(row.id, { decision: e.target.value as ReviewDecision })}
+                      disabled={saving}
+                    >
+                      {DECISIONS.map((d) => (
+                        <option key={d.value} value={d.value}>
+                          {d.label}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="grid__edge">{edges.map((e) => e.detail).join('; ')}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
       </div>
 
       <div className="gate">
