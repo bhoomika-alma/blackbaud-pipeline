@@ -1,4 +1,4 @@
-STATUS: IN_PROGRESS
+STATUS: COMPLETE
 
 # Build progress — Blackbaud → HubSpot CSV import tool
 
@@ -31,7 +31,7 @@ Tasks are taken top-to-bottom, one per iteration. See `BUILD_SPEC.md` for the fu
 
 ## Phase 5 — Wire-up & verify
 - [x] Sample CSV fixture; unit tests for cleaning + classification with mocked HTTP; typecheck/build both apps. — `_fixtures/sample_blackbaud.csv` (7 diverse rows) + `_shared/fixture.test.ts` (end-to-end parse→clean→classify with mocked HubSpot results); added --allow-read to test task. Verified: 66 backend tests pass, deno check all entrypoints, frontend typecheck+lint+build all clean.
-- [ ] Finalize README (setup, where to put secrets) + both `.env.example` files.
+- [x] Finalize README (setup, where to put secrets) + both `.env.example` files. — README finalized (architecture, classification + 7 edge cases, data model, local/deploy steps, where secrets go, test commands, sample fixture link); both `.env.example` files confirmed to match exactly the vars the code reads. Full verification: supabase deno check/lint/fmt clean + 66 tests pass; frontend typecheck/lint/build clean.
 
 ## Notes
 - (iteration 1) Bootstrap: git init, remote set to work alias, `.gitignore` + `PROGRESS.md` created.
