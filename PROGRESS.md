@@ -5,7 +5,7 @@ STATUS: IN_PROGRESS
 Tasks are taken top-to-bottom, one per iteration. See `BUILD_SPEC.md` for the full spec.
 
 ## Phase 0 — Scaffold
-- [ ] Repo layout `/frontend` + `/supabase`; root README; root `.env.example` + `frontend/.env.example` documenting every variable with a description.
+- [x] Repo layout `/frontend` + `/supabase`; root README; root `.env.example` + `frontend/.env.example` documenting every variable with a description. — created dirs (.gitkeep), root README (architecture/setup/secrets), root `.env.example` (SUPABASE_URL, SERVICE_ROLE_KEY, HUBSPOT_TOKEN, bucket, 4 pipeline IDs), `frontend/.env.example` (VITE_* only).
 - [ ] Init `/frontend` (Vite + React + TS) + Supabase JS client + router for the 5 screens.
 - [ ] Init `/supabase` (config.toml, functions/, migrations/).
 
