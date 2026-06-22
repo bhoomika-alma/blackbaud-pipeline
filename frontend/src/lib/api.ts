@@ -2,7 +2,7 @@
 // through the Edge Functions (the browser never calls HubSpot directly).
 
 import { ANON_KEY, FUNCTIONS_URL, STORAGE_BUCKET, supabase } from './supabase'
-import type { ClassifyResponse, IngestResponse } from './types'
+import type { ClassifyResponse, DealRow, ImportRun, IngestResponse } from './types'
 
 function sanitizeFilename(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, '_')
@@ -54,4 +54,38 @@ export function classify(importRunId: string): Promise<ClassifyResponse> {
 
 export function runImport(importRunId: string, reviewedByEmail?: string): Promise<unknown> {
   return invokeFunction('import', { importRunId, reviewedByEmail })
+}
+
+// ── Reads (anon key; RLS disabled for this no-auth internal tool) ──
+
+export async function getRun(runId: string): Promise<ImportRun> {
+  const { data, error } = await supabase.from('import_runs').select('*').eq('id', runId).single()
+  if (error || !data) throw new Error(error?.message ?? 'Import run not found')
+  return data as ImportRun
+}
+
+export async function getRows(runId: string): Promise<DealRow[]> {
+  const { data, error } = await supabase
+    .from('deal_rows')
+    .select('*')
+    .eq('import_run_id', runId)
+    .order('row_number', { ascending: true })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as DealRow[]
+}
+
+export async function updateRowReview(
+  rowId: string,
+  patch: Partial<Pick<DealRow, 'review_decision' | 'arr_final' | 'domain_final' | 'linked_hs_deal_id'>>,
+): Promise<void> {
+  const { error } = await supabase.from('deal_rows').update(patch).eq('id', rowId)
+  if (error) throw new Error(error.message)
+}
+
+export async function updateRunReview(
+  runId: string,
+  patch: { review_status?: string; reviewed_by_email?: string; review_notes?: string },
+): Promise<void> {
+  const { error } = await supabase.from('import_runs').update(patch).eq('id', runId)
+  if (error) throw new Error(error.message)
 }
