@@ -47,6 +47,8 @@ inspector_port = 8083
 [functions.ingest]
 verify_jwt = false
 
-# Registered as they are added later in Phase 3:
-#   [functions.classify] verify_jwt = false
+[functions.classify]
+verify_jwt = false
+
+# Registered as it is added later in Phase 3:
 #   [functions.import]   verify_jwt = false

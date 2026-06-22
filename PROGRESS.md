@@ -20,7 +20,7 @@ Tasks are taken top-to-bottom, one per iteration. See `BUILD_SPEC.md` for the fu
 
 ## Phase 3 — Edge Functions
 - [x] `ingest`: CSV from Storage → parse → create import_run → insert cleaned deal_rows. — `functions/ingest/{ingest.ts,index.ts}` + shared `csv.ts` (std parser), `blackbaud.ts` (column alias mapping + validateColumns + buildCleanedRow + normalizeDate), `http.ts` (CORS/json). runIngest is DI'd for testing; index.ts wires service-role Supabase client + Deno.serve. Registered [functions.ingest] in config.toml; switched supabase-js import to npm:. 15 new tests; 43 backend tests pass. deno check (incl. supabase-js)/lint/fmt clean.
-- [ ] `classify`: Phase C per row → write classification → roll up counts + edge_cases.
+- [x] `classify`: Phase C per row → write classification → roll up counts + edge_cases. — `functions/classify/{classify.ts,index.ts}`: pure `classifyRow` (bbid→EXISTING/INTERNAL by pipeline; no-bbid→HOLD or name-search NEW/REVIEW), DI'd `runClassify` (batch bbid search, name-search cache, per-row updates, rollup new/existing/review + edge_cases jsonb incl. dup-bbid/ARR/domain-flag). Registered [functions.classify]. 11 new tests; 54 backend tests pass. deno check/lint/fmt clean.
 - [ ] `import`: approved rows → EXISTING updates + NEW creates → results → post-import dup-company check → summary.
 
 ## Phase 4 — Frontend
