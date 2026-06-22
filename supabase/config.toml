@@ -42,7 +42,11 @@ enabled = true
 policy = "oneshot"
 inspector_port = 8083
 
-# Edge Functions (registered individually in Phase 3):
-#   [functions.ingest]   verify_jwt = false
+# Edge Functions. verify_jwt is off — this is a no-auth internal tool; the
+# browser calls these with the anon key and the functions use the service role.
+[functions.ingest]
+verify_jwt = false
+
+# Registered as they are added later in Phase 3:
 #   [functions.classify] verify_jwt = false
 #   [functions.import]   verify_jwt = false

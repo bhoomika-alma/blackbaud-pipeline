@@ -19,7 +19,7 @@ Tasks are taken top-to-bottom, one per iteration. See `BUILD_SPEC.md` for the fu
 - [x] HubSpot client (searchDealsByBbid batch, searchDealsByName, batchUpdateDeals idProperty=unique_bb_id, upsertCompany/Contact/Deal, createAssociations). Mockable. — `functions/_shared/hubspot.ts`: HubSpotClient with injectable fetch (mockable), bearer auth, batch search by unique_bb_id (≤100 + paging), name search, batch/update with idProperty, upserts deduped by domain/email/unique_bb_id, v4 default associations. 10 unit tests with mocked HTTP (28 backend tests total). deno check/lint/fmt/test clean.
 
 ## Phase 3 — Edge Functions
-- [ ] `ingest`: CSV from Storage → parse → create import_run → insert cleaned deal_rows.
+- [x] `ingest`: CSV from Storage → parse → create import_run → insert cleaned deal_rows. — `functions/ingest/{ingest.ts,index.ts}` + shared `csv.ts` (std parser), `blackbaud.ts` (column alias mapping + validateColumns + buildCleanedRow + normalizeDate), `http.ts` (CORS/json). runIngest is DI'd for testing; index.ts wires service-role Supabase client + Deno.serve. Registered [functions.ingest] in config.toml; switched supabase-js import to npm:. 15 new tests; 43 backend tests pass. deno check (incl. supabase-js)/lint/fmt clean.
 - [ ] `classify`: Phase C per row → write classification → roll up counts + edge_cases.
 - [ ] `import`: approved rows → EXISTING updates + NEW creates → results → post-import dup-company check → summary.
 
