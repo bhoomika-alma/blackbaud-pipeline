@@ -50,5 +50,5 @@ verify_jwt = false
 [functions.classify]
 verify_jwt = false
 
-# Registered as it is added later in Phase 3:
-#   [functions.import]   verify_jwt = false
+[functions.import]
+verify_jwt = false
