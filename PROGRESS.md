@@ -24,7 +24,7 @@ Tasks are taken top-to-bottom, one per iteration. See `BUILD_SPEC.md` for the fu
 - [x] `import`: approved rows → EXISTING updates + NEW creates → results → post-import dup-company check → summary. — `functions/import/{import.ts,index.ts}`: pure resolveImportAction + payload builders (create INCLUDES amount; update OMITS amount/dealname/pipeline), DI'd runImport (batch update by unique_bb_id; create company-by-domain + contact-by-email + deal + 2 v4 associations; per-row results; dup-company check; summary jsonb + completed status). Registered [functions.import]. 10 new tests; 64 backend tests pass. deno check/lint/fmt clean.
 
 ## Phase 4 — Frontend
-- [ ] Screen 1 Upload (→ Storage → trigger ingest+classify).
+- [x] Screen 1 Upload (→ Storage → trigger ingest+classify). — `frontend/src/lib/{api.ts,types.ts}` (Storage upload + Edge Function invoke via anon key; shared run/row types) + `UploadPage.tsx`: email (no-auth, prefilled from localStorage) + source label + CSV → upload to bb-uploads → ingest → classify → navigate to /results/:runId, with per-phase status + error handling. typecheck/lint/build clean.
 - [ ] Screen 2 Results dashboard + Approved? gate.
 - [ ] Screen 3 Review (the 7 edge cases; edit ARR/domain; decisions; approve).
 - [ ] Screens 4+5 Import + Summary.

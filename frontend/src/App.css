@@ -33,3 +33,70 @@
   border-radius: 8px;
   padding: 1.5rem;
 }
+
+.muted {
+  color: #616e7c;
+  font-size: 0.9rem;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 460px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #3e4c59;
+}
+
+.field input,
+.field select {
+  font: inherit;
+  font-weight: 400;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid #cbd2d9;
+  border-radius: 6px;
+}
+
+button {
+  font: inherit;
+  font-weight: 600;
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.55rem 1rem;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+button:disabled {
+  background: #9aa5b1;
+  cursor: not-allowed;
+}
+
+button.secondary {
+  background: #fff;
+  color: #2563eb;
+  border: 1px solid #2563eb;
+}
+
+.error {
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+}
+
+.status {
+  color: #1e40af;
+  font-size: 0.85rem;
+}

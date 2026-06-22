@@ -9,3 +9,4 @@ export const supabase = createClient(env.supabaseUrl, env.supabaseAnonKey)
 
 export const STORAGE_BUCKET = env.bucket
 export const FUNCTIONS_URL = env.functionsUrl
+export const ANON_KEY = env.supabaseAnonKey
