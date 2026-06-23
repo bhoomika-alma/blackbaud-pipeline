@@ -2,12 +2,19 @@
 
 export type PipelineKey = "highered" | "k12" | "canada" | "england";
 
-/** The four Blackbaud pipelines, by stable key and display name. */
-export const BB_PIPELINES: Record<PipelineKey, { key: PipelineKey; name: string }> = {
-  highered: { key: "highered", name: "Blackbaud HigherEd pipeline" },
-  k12: { key: "k12", name: "Blackbaud k12 pipeline" },
-  canada: { key: "canada", name: "Blackbaud Canada" },
-  england: { key: "england", name: "Blackbaud England" },
+/**
+ * The four Blackbaud pipelines, by stable key, display name, and HubSpot
+ * `region` enum code. The HubSpot deal `region` property is an enumeration that
+ * only accepts BBUS / BBC / BBE (US, Canada, England) — both US pipelines map to BBUS.
+ */
+export const BB_PIPELINES: Record<
+  PipelineKey,
+  { key: PipelineKey; name: string; regionCode: string }
+> = {
+  highered: { key: "highered", name: "Blackbaud HigherEd pipeline", regionCode: "BBUS" },
+  k12: { key: "k12", name: "Blackbaud k12 pipeline", regionCode: "BBUS" },
+  canada: { key: "canada", name: "Blackbaud Canada", regionCode: "BBC" },
+  england: { key: "england", name: "Blackbaud England", regionCode: "BBE" },
 };
 
 /** Stages that count as "active" — drive the demonstrate-stage date and Phase C. */

@@ -88,6 +88,7 @@ Deno.test("cleanAmount strips currency formatting", () => {
 Deno.test("buildUpdateProperties only sends properties that exist in HubSpot", () => {
   const props = buildUpdateProperties(makeRow({
     deal_name: "Acme - Blackbaud Canada",
+    derived_pipeline: "Blackbaud Canada",
     arr_final: 9999,
     close_date: "2026-06-30",
     region: "Canada",
@@ -105,6 +106,7 @@ Deno.test("buildUpdateProperties only sends properties that exist in HubSpot", (
   // real properties we do write
   assertEquals(props.closedate, "2026-06-30");
   assertEquals(props.demonstrate_stage_date, "2026-03-15");
+  assertEquals(props.region, "BBC"); // enum value, not raw "Canada"
 });
 
 Deno.test("buildCreateDealProperties includes amount + pipeline + unique_bb_id", () => {
@@ -112,6 +114,7 @@ Deno.test("buildCreateDealProperties includes amount + pipeline + unique_bb_id",
     makeRow({
       bb_id: "BB1",
       deal_name: "Acme - Blackbaud Canada",
+      derived_pipeline: "Blackbaud Canada",
       arr_raw: "$50,000",
       close_date: "2026-06-30",
     }),
@@ -121,9 +124,19 @@ Deno.test("buildCreateDealProperties includes amount + pipeline + unique_bb_id",
   assertEquals(props.dealname, "Acme - Blackbaud Canada");
   assertEquals(props.pipeline, "36496197");
   assertEquals(props.amount, "50000");
+  assertEquals(props.region, "BBC"); // enum value mapped from the routed pipeline
   // bb_region / bb_vertical do not exist in HubSpot — never sent.
   assertEquals("bb_region" in props, false);
   assertEquals("bb_vertical" in props, false);
+});
+
+Deno.test("region enum maps US/LatAm→BBUS, Canada→BBC, England→BBE", () => {
+  const regionOf = (pipelineName: string) =>
+    buildCreateDealProperties(makeRow({ bb_id: "X", derived_pipeline: pipelineName })).region;
+  assertEquals(regionOf("Blackbaud HigherEd pipeline"), "BBUS");
+  assertEquals(regionOf("Blackbaud k12 pipeline"), "BBUS");
+  assertEquals(regionOf("Blackbaud Canada"), "BBC");
+  assertEquals(regionOf("Blackbaud England"), "BBE");
 });
 
 Deno.test("buildCreateDealProperties prefers arr_final over arr_raw", () => {

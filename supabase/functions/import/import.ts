@@ -2,7 +2,7 @@
 // duplicate-company check + summary. Pure helpers (action resolution + property
 // builders) are unit-tested; `runImport` orchestrates with injected I/O.
 
-import { type PipelineKey, pipelineKeyForName } from "../_shared/clean.ts";
+import { BB_PIPELINES, type PipelineKey, pipelineKeyForName } from "../_shared/clean.ts";
 import { errorMessage } from "../_shared/http.ts";
 
 export type ImportAction = "create" | "update" | "skip";
@@ -77,6 +77,12 @@ function pipelineIdFor(
   return key ? pipelineIds[key] : undefined;
 }
 
+/** HubSpot `region` enum value (BBUS/BBC/BBE) derived from the routed pipeline. */
+function regionCodeFor(row: ImportRow): string | undefined {
+  const key = row.derived_pipeline ? pipelineKeyForName(row.derived_pipeline) : undefined;
+  return key ? BB_PIPELINES[key].regionCode : undefined;
+}
+
 // Only these deal properties exist in HubSpot, so these are all we ever send.
 // region/vertical have no HubSpot deal property (bb_region / bb_vertical do not
 // exist), and there is no separate last_stage_change_date property — that signal
@@ -95,6 +101,7 @@ export function buildCreateDealProperties(
   setProp(props, "amount", finalArr(row));
   setProp(props, "closedate", row.close_date);
   setProp(props, "demonstrate_stage_date", row.demonstrate_stage_date);
+  setProp(props, "region", regionCodeFor(row));
   return props;
 }
 
@@ -106,6 +113,7 @@ export function buildUpdateProperties(row: ImportRow): Record<string, string> {
   const props: Record<string, string> = {};
   setProp(props, "closedate", row.close_date);
   setProp(props, "demonstrate_stage_date", row.demonstrate_stage_date);
+  setProp(props, "region", regionCodeFor(row));
   return props;
 }
 
