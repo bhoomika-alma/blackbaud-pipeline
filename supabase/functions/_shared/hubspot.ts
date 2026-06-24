@@ -62,8 +62,14 @@ export class HubSpotClient {
     this.fetchImpl = options.fetchImpl ?? fetch;
   }
 
-  static fromConfig(config: BackendConfig, fetchImpl?: FetchLike): HubSpotClient {
-    return new HubSpotClient({ token: config.hubspotToken, fetchImpl });
+  /** Client for READS (lists, imports, lookups) — production token. */
+  static read(config: BackendConfig, fetchImpl?: FetchLike): HubSpotClient {
+    return new HubSpotClient({ token: config.hubspotReadToken, fetchImpl });
+  }
+
+  /** Client for WRITES (create/update/associate) — sandbox token. */
+  static write(config: BackendConfig, fetchImpl?: FetchLike): HubSpotClient {
+    return new HubSpotClient({ token: config.hubspotWriteToken, fetchImpl });
   }
 
   private async request<T>(path: string, options: RequestOptions = {}): Promise<T> {

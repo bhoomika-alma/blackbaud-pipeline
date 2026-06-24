@@ -32,7 +32,8 @@ Deno.serve(async (req) => {
   const supabase = createClient(config.supabaseUrl, config.supabaseServiceRoleKey, {
     auth: { persistSession: false },
   });
-  const hubspot = HubSpotClient.fromConfig(config);
+  // Import WRITES to the sandbox (create/update/associate + its pre-create search).
+  const hubspot = HubSpotClient.write(config);
   const now = new Date().toISOString();
 
   const deps: ImportDeps = {

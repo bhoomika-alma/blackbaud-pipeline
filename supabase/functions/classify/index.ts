@@ -37,7 +37,8 @@ Deno.serve(async (req) => {
   const supabase = createClient(config.supabaseUrl, config.supabaseServiceRoleKey, {
     auth: { persistSession: false },
   });
-  const hubspot = HubSpotClient.fromConfig(config);
+  // Classification READS from production (lists, imports, lookups).
+  const hubspot = HubSpotClient.read(config);
 
   const currentYear = new Date().getUTCFullYear();
 
