@@ -88,13 +88,19 @@ Deno.test("ACTIVE_STAGES holds the three active stages", () => {
 
 // ───────────────────────────── derivePipeline ─────────────────────────────
 
-Deno.test("derivePipeline: region + vertical mapping", () => {
+Deno.test("derivePipeline: region + vertical mapping (names and BB codes)", () => {
+  // England / Canada — dedicated pipelines, no vertical split.
   assertEquals(derivePipeline("England", "HigherEd"), "Blackbaud England");
+  assertEquals(derivePipeline("BBE", "Schools (K-12)"), "Blackbaud England");
   assertEquals(derivePipeline("Canada", "K12"), "Blackbaud Canada");
-  assertEquals(derivePipeline("US", "K12"), "Blackbaud k12 pipeline");
-  assertEquals(derivePipeline("US", "Higher Ed"), "Blackbaud HigherEd pipeline");
+  assertEquals(derivePipeline("BBC", "Schools (K-12)"), "Blackbaud Canada");
+  // US / LatAm-Caribbean — split by vertical (real K-12 value is "Schools (K-12)").
+  assertEquals(derivePipeline("US", "Schools (K-12)"), "Blackbaud k12 pipeline");
+  assertEquals(derivePipeline("BBUS", "Schools (K-12)"), "Blackbaud k12 pipeline");
+  assertEquals(derivePipeline("BBUS", "Higher Education"), "Blackbaud HigherEd pipeline");
+  assertEquals(derivePipeline("BBLATCAR", "Schools (K-12)"), "Blackbaud k12 pipeline");
+  assertEquals(derivePipeline("BBLATCAR", "Healthcare"), "Blackbaud HigherEd pipeline");
   assertEquals(derivePipeline("LatAm", "K-12"), "Blackbaud k12 pipeline");
-  assertEquals(derivePipeline("LatAm", "HigherEd"), "Blackbaud HigherEd pipeline");
   // Unknown region defaults to the US branch.
   assertEquals(derivePipeline("", ""), "Blackbaud HigherEd pipeline");
 });

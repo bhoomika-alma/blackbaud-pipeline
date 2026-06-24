@@ -109,19 +109,28 @@ function normalizeVertical(vertical: string | null | undefined): string {
 }
 
 /**
+ * A vertical is K-12 if its normalized form contains "k12". Catches the real
+ * Blackbaud value "Schools (K-12)" → "schoolsk12", plus "K-12" / "K12".
+ */
+export function isK12Vertical(vertical: string | null | undefined): boolean {
+  return normalizeVertical(vertical).includes("k12");
+}
+
+/**
  * Derive the pipeline NAME from region + vertical:
- *   England → "Blackbaud England"; Canada → "Blackbaud Canada";
- *   US / LatAm (and any other region) → K12 → "Blackbaud k12 pipeline",
- *   else → "Blackbaud HigherEd pipeline".
+ *   - England (BBE) → "Blackbaud England"; Canada (BBC) → "Blackbaud Canada"
+ *     — dedicated pipelines, NO vertical split.
+ *   - US (BBUS) and LatAm/Caribbean (BBLATCAR), and any other region → split by
+ *     vertical: Schools (K-12) → "Blackbaud k12 pipeline", else → "Blackbaud HigherEd pipeline".
  */
 export function derivePipeline(
   region: string | null | undefined,
   vertical: string | null | undefined,
 ): string {
   const r = (region ?? "").trim().toLowerCase();
-  if (r === "england") return BB_PIPELINES.england.name;
-  if (r === "canada") return BB_PIPELINES.canada.name;
-  return normalizeVertical(vertical) === "k12" ? BB_PIPELINES.k12.name : BB_PIPELINES.highered.name;
+  if (r === "england" || r === "bbe") return BB_PIPELINES.england.name;
+  if (r === "canada" || r === "bbc") return BB_PIPELINES.canada.name;
+  return isK12Vertical(vertical) ? BB_PIPELINES.k12.name : BB_PIPELINES.highered.name;
 }
 
 /** Reverse-lookup the pipeline key for a derived pipeline name. */
