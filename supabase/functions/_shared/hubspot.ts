@@ -212,6 +212,77 @@ export class HubSpotClient {
     return created;
   }
 
+  /** Resolve a list by exact name (case-insensitive) → its listId, or null. */
+  async findListIdByName(name: string): Promise<string | null> {
+    const res = await this.request<{ lists?: { listId: string; name: string }[] }>(
+      "/crm/v3/lists/search",
+      { method: "POST", body: JSON.stringify({ query: name, count: 100 }) },
+    );
+    const want = name.trim().toLowerCase();
+    const match = (res.lists ?? []).find((l) => (l.name ?? "").trim().toLowerCase() === want);
+    return match?.listId ?? null;
+  }
+
+  /** All member record ids of a list (paginated). */
+  async getListMemberRecordIds(listId: string): Promise<string[]> {
+    const ids: string[] = [];
+    let after: string | undefined;
+    do {
+      const query = after ? `?limit=250&after=${encodeURIComponent(after)}` : "?limit=250";
+      const res = await this.request<
+        { results?: { recordId: string }[]; paging?: { next?: { after?: string } } }
+      >(`/crm/v3/lists/${listId}/memberships${query}`);
+      for (const m of res.results ?? []) if (m.recordId) ids.push(m.recordId);
+      after = res.paging?.next?.after;
+    } while (after);
+    return ids;
+  }
+
+  /** Batch-read deals by object id (≤100/call). */
+  async batchReadDeals(dealIds: string[], properties: string[]): Promise<HubSpotDeal[]> {
+    const out: HubSpotDeal[] = [];
+    for (const group of chunk(dealIds, 100)) {
+      const res = await this.request<BatchResult>("/crm/v3/objects/deals/batch/read", {
+        method: "POST",
+        body: JSON.stringify({ properties, inputs: group.map((id) => ({ id })) }),
+      });
+      out.push(...res.results);
+    }
+    return out;
+  }
+
+  /**
+   * Resolve a deal list by name → the set of member `unique_bb_id`s plus the set
+   * of lowercased member deal names (backup match key). Empty sets if not found.
+   */
+  async getListDealKeys(name: string): Promise<{ bbids: Set<string>; names: Set<string> }> {
+    const bbids = new Set<string>();
+    const names = new Set<string>();
+    const listId = await this.findListIdByName(name);
+    if (!listId) return { bbids, names };
+    const recordIds = await this.getListMemberRecordIds(listId);
+    if (recordIds.length === 0) return { bbids, names };
+    const deals = await this.batchReadDeals(recordIds, ["unique_bb_id", "dealname"]);
+    for (const deal of deals) {
+      const bb = deal.properties["unique_bb_id"]?.trim();
+      if (bb) bbids.add(bb);
+      const nm = deal.properties["dealname"]?.trim().toLowerCase();
+      if (nm) names.add(nm);
+    }
+    return { bbids, names };
+  }
+
+  /** Recent CRM imports (name + createdAt) — used to find the last BB import date. */
+  async getRecentImports(limit = 100): Promise<{ name: string; createdAt: string | null }[]> {
+    const res = await this.request<
+      { results?: { importName?: string; name?: string; createdAt?: string }[] }
+    >(`/crm/v3/imports?limit=${limit}`);
+    return (res.results ?? []).map((r) => ({
+      name: r.importName ?? r.name ?? "",
+      createdAt: r.createdAt ?? null,
+    }));
+  }
+
   /** Create a v4 default association between two objects. */
   async createAssociation(
     fromType: string,

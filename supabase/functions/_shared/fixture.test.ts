@@ -4,10 +4,13 @@
 import { assertEquals } from "std/assert/mod.ts";
 import { buildCleanedRow, validateColumns } from "./blackbaud.ts";
 import { parseCsv } from "./csv.ts";
-import { type ClassifyRow, classifyRow } from "../classify/classify.ts";
-import type { HubSpotDeal } from "./hubspot.ts";
+import {
+  type ClassifyContext,
+  type ClassifyRow,
+  classifyRow,
+  type ListKeys,
+} from "../classify/classify.ts";
 
-const BB_PIPELINES = new Set(["16363685", "23038595", "36496197", "36528146"]);
 const csvText = await Deno.readTextFile(
   new URL("../_fixtures/sample_blackbaud.csv", import.meta.url),
 );
@@ -49,53 +52,57 @@ Deno.test("fixture: columns validate and rows clean per Phase B", () => {
   assertEquals(rows[5].derived_pipeline, "Blackbaud England");
 });
 
-function asClassifyRow(
-  bbId: string | null,
-  stage: string,
-  dealName: string,
-): ClassifyRow {
+function asClassifyRow(bbId: string | null, stage: string, dealName: string): ClassifyRow {
   return {
     id: "x",
     row_number: 1,
     bb_id: bbId,
     stage,
     deal_name: dealName,
+    created_date: null,
     domain: null,
     domain_flagged: false,
   };
 }
 
-function deal(pipeline: string): HubSpotDeal {
-  return { id: "d1", properties: { pipeline } };
+function keys(bbids: string[] = [], names: string[] = []): ListKeys {
+  return { bbids: new Set(bbids), names: new Set(names.map((n) => n.toLowerCase())) };
 }
 
-Deno.test("fixture: classification over mocked HubSpot results", () => {
-  // bb_id match in a Blackbaud pipeline → EXISTING.
+function ctx(over: Partial<ClassifyContext> = {}): ClassifyContext {
+  return { internal: keys(), existing: keys(), lastImportDate: null, ...over };
+}
+
+Deno.test("fixture: classification over the two lists", () => {
+  // In the internal-moved list → INTERNAL.
   assertEquals(
-    classifyRow(asClassifyRow("BB1001", "Demonstrate", "x"), [deal("36496197")], null, BB_PIPELINES)
-      .classification,
-    "existing",
-  );
-  // bb_id match outside Blackbaud pipelines → INTERNAL.
-  assertEquals(
-    classifyRow(asClassifyRow("BB9", "Demonstrate", "x"), [deal("70000000")], null, BB_PIPELINES)
+    classifyRow(asClassifyRow("BB9", "Demonstrate", "x"), ctx({ internal: keys(["BB9"]) }), null)
       .classification,
     "internal",
   );
-  // no bb_id match + inactive stage → HOLD.
+  // In the BB Pipeline Deals list → EXISTING.
   assertEquals(
-    classifyRow(asClassifyRow(null, "Discover", "x"), [], null, BB_PIPELINES).classification,
+    classifyRow(
+      asClassifyRow("BB1001", "Demonstrate", "x"),
+      ctx({ existing: keys(["BB1001"]) }),
+      null,
+    )
+      .classification,
+    "existing",
+  );
+  // Unmapped + inactive stage → HOLD.
+  assertEquals(
+    classifyRow(asClassifyRow(null, "Discover", "x"), ctx(), null).classification,
     "hold",
   );
-  // no match, active stage, no name match → NEW.
+  // Unmapped + active + no name match → NEW.
   assertEquals(
-    classifyRow(asClassifyRow(null, "Propose", "Acme - X"), [], [], BB_PIPELINES).classification,
+    classifyRow(asClassifyRow(null, "Propose", "Acme - X"), ctx(), 0).classification,
     "new",
   );
-  // no match, active stage, 1 name match → REVIEW.
+  // Unmapped + active + 1 name match → REVIEW.
   assertEquals(
-    classifyRow(asClassifyRow(null, "Propose", "Acme - X"), [], [deal("1")], BB_PIPELINES)
-      .classification,
+    classifyRow(asClassifyRow(null, "Propose", "Acme - X"), ctx(), 1).classification,
     "review",
   );
 });

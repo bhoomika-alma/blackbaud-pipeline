@@ -164,3 +164,61 @@ Deno.test("request throws with the HTTP status on a non-ok response", async () =
   const { hs } = client([{ status: 404, body: { message: "Not found" } }]);
   await assertRejects(() => hs.searchDealsByName("x"), Error, "404");
 });
+
+Deno.test("findListIdByName matches a list by name (case-insensitive)", async () => {
+  const { hs, calls } = client([{
+    body: {
+      lists: [
+        { listId: "10", name: "Other List" },
+        { listId: "77", name: "BB Pipeline Deals" },
+      ],
+    },
+  }]);
+  assertEquals(await hs.findListIdByName("bb pipeline deals"), "77");
+  assertStringIncludes(calls[0].url, "/crm/v3/lists/search");
+});
+
+Deno.test("getListDealKeys resolves list → member bbids + lowercased names", async () => {
+  const { hs } = client([
+    { body: { lists: [{ listId: "77", name: "BB Pipeline Deals" }] } }, // findListIdByName
+    { body: { results: [{ recordId: "d1" }, { recordId: "d2" }] } }, // memberships
+    {
+      body: {
+        results: [
+          { id: "d1", properties: { unique_bb_id: "A", dealname: "Acme - X" } },
+          { id: "d2", properties: { unique_bb_id: "B", dealname: "Beta - Y" } },
+        ],
+      },
+    }, // batch read
+  ]);
+  const out = await hs.getListDealKeys("BB Pipeline Deals");
+  assertEquals([...out.bbids].sort(), ["A", "B"]);
+  assertEquals(out.names.has("acme - x"), true);
+  assertEquals(out.names.has("beta - y"), true);
+});
+
+Deno.test("getListDealKeys returns empty sets when the list is not found", async () => {
+  const { hs, calls } = client([{ body: { lists: [] } }]);
+  const out = await hs.getListDealKeys("Missing List");
+  assertEquals(out.bbids.size, 0);
+  assertEquals(out.names.size, 0);
+  assertEquals(calls.length, 1); // only the search call, no memberships/read
+});
+
+Deno.test("getRecentImports returns import names + createdAt", async () => {
+  const { hs, calls } = client([{
+    body: {
+      results: [
+        {
+          importName: "BB Pipeline Report 29th May 2026 - New deals",
+          createdAt: "2026-05-29T00:00:00Z",
+        },
+        { name: "Legacy import", createdAt: "2026-04-01T00:00:00Z" },
+      ],
+    },
+  }]);
+  const imports = await hs.getRecentImports();
+  assertEquals(imports[0].name, "BB Pipeline Report 29th May 2026 - New deals");
+  assertEquals(imports[1].name, "Legacy import");
+  assertStringIncludes(calls[0].url, "/crm/v3/imports");
+});

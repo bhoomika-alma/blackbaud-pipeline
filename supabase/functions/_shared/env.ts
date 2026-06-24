@@ -16,6 +16,13 @@ export interface BackendConfig {
     canada: string;
     england: string;
   };
+  /** HubSpot deal-list names used for classification (Phase C). */
+  lists: {
+    /** Deals already moved into internal pipelines → INTERNAL (skip). */
+    internal: string;
+    /** Deals currently in a Blackbaud pipeline → EXISTING (update). */
+    pipeline: string;
+  };
 }
 
 function required(name: string): string {
@@ -46,6 +53,10 @@ export function getConfig(): BackendConfig {
       k12: optional("HUBSPOT_PIPELINE_K12", "23038595"),
       canada: optional("HUBSPOT_PIPELINE_CANADA", "36496197"),
       england: optional("HUBSPOT_PIPELINE_ENGLAND", "36528146"),
+    },
+    lists: {
+      internal: optional("BB_LIST_INTERNAL", "BB Pipeline Deals moved to Internal Pipelines"),
+      pipeline: optional("BB_LIST_PIPELINE", "BB Pipeline Deals"),
     },
   };
 }

@@ -2,10 +2,15 @@
 // Supabase service-role client into runClassify.
 
 import { createClient } from "@supabase/supabase-js";
-import { blackbaudPipelineIds, getConfig } from "../_shared/env.ts";
+import { getConfig } from "../_shared/env.ts";
 import { HubSpotClient } from "../_shared/hubspot.ts";
 import { errorMessage, handleOptions, json } from "../_shared/http.ts";
-import { type ClassifyDeps, type ClassifyRow, runClassify } from "./classify.ts";
+import {
+  type ClassifyDeps,
+  type ClassifyRow,
+  latestBbImportDate,
+  runClassify,
+} from "./classify.ts";
 
 Deno.serve(async (req) => {
   const preflight = handleOptions(req);
@@ -34,18 +39,24 @@ Deno.serve(async (req) => {
   });
   const hubspot = HubSpotClient.fromConfig(config);
 
+  const currentYear = new Date().getUTCFullYear();
+
   const deps: ClassifyDeps = {
     loadRows: async (runId) => {
       const { data, error } = await supabase
         .from("deal_rows")
-        .select("id,row_number,bb_id,stage,deal_name,domain,domain_flagged")
+        .select("id,row_number,bb_id,stage,deal_name,created_date,domain,domain_flagged")
         .eq("import_run_id", runId)
         .order("row_number", { ascending: true });
       if (error) throw new Error(`Failed to load deal_rows: ${error.message}`);
       return (data ?? []) as ClassifyRow[];
     },
-    searchByBbid: (bbIds) => hubspot.searchDealsByBbid(bbIds),
-    searchByName: (dealName) => hubspot.searchDealsByName(dealName),
+    getListKeys: (listName) => hubspot.getListDealKeys(listName),
+    getLastImportDate: async () => {
+      const imports = await hubspot.getRecentImports();
+      return latestBbImportDate(imports, currentYear);
+    },
+    searchByName: async (dealName) => (await hubspot.searchDealsByName(dealName)).length,
     updateRow: async (rowId, patch) => {
       const { error } = await supabase.from("deal_rows").update(patch).eq("id", rowId);
       if (error) throw new Error(`Failed to update deal_row ${rowId}: ${error.message}`);
@@ -59,7 +70,8 @@ Deno.serve(async (req) => {
   try {
     const result = await runClassify(deps, {
       importRunId,
-      blackbaudPipelineIds: blackbaudPipelineIds(config),
+      internalListName: config.lists.internal,
+      existingListName: config.lists.pipeline,
     });
     return json(result, 200);
   } catch (error) {
