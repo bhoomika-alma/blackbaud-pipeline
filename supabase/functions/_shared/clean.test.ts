@@ -59,6 +59,18 @@ Deno.test("splitName: first token vs remainder", () => {
   assertEquals(splitName(""), { firstName: "", lastName: "" });
 });
 
+Deno.test("splitName: falls back to the email local-part when name is blank", () => {
+  assertEquals(splitName("", "jane.doe@uwindsor.ca"), { firstName: "Jane", lastName: "Doe" });
+  assertEquals(splitName(null, "j_q_public@acme.org"), { firstName: "J", lastName: "Q Public" });
+  assertEquals(splitName("", "madonna@x.com"), { firstName: "Madonna", lastName: "" });
+  // a real name always wins over the email
+  assertEquals(splitName("Alan Turing", "ignored@x.com"), {
+    firstName: "Alan",
+    lastName: "Turing",
+  });
+  assertEquals(splitName("", ""), { firstName: "", lastName: "" });
+});
+
 // ─────────────────────────── demonstrateStageDate ───────────────────────────
 
 Deno.test("demonstrateStageDate: set for active stages, blank otherwise", () => {

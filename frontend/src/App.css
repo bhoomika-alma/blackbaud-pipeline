@@ -150,6 +150,12 @@ button.danger:disabled {
   font-size: 0.9rem;
 }
 
+.card__sub {
+  font-size: 1rem;
+  font-weight: 400;
+  color: #7b8794;
+}
+
 .card__hint {
   font-size: 0.75rem;
   color: #7b8794;

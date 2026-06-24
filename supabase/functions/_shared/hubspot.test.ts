@@ -109,42 +109,45 @@ Deno.test("batchUpdateDeals matches on unique_bb_id via idProperty", async () =>
   assertEquals(inputs[0].id, "A1");
 });
 
-Deno.test("upsertCompany creates when no match (search then POST)", async () => {
-  const { hs, calls } = client([
-    { body: { results: [] } }, // search → none
-    { body: { id: "comp-1" } }, // create
-  ]);
-  const res = await hs.upsertCompany("acme.com", { name: "Acme" });
-  assertEquals(res, { id: "comp-1", created: true });
+Deno.test("batchSearchIds returns propertyValue → id for existing records", async () => {
+  const { hs, calls } = client([{
+    body: {
+      results: [
+        { id: "comp-1", properties: { domain: "acme.com" } },
+        { id: "comp-2", properties: { domain: "beta.org" } },
+      ],
+    },
+  }]);
+  const map = await hs.batchSearchIds("companies", "domain", ["acme.com", "beta.org", "gamma.io"]);
+  assertEquals(map.get("acme.com"), "comp-1");
+  assertEquals(map.get("beta.org"), "comp-2");
+  assertEquals(map.has("gamma.io"), false); // not returned → treated as new
   assertStringIncludes(calls[0].url, "/crm/v3/objects/companies/search");
-  assertEquals(calls[1].method, "POST");
-  assertStringIncludes(calls[1].url, "/crm/v3/objects/companies");
-  assertEquals((calls[1].body as { properties: { domain: string } }).properties.domain, "acme.com");
+  const filter =
+    (calls[0].body as { filterGroups: { filters: { operator: string; values: string[] }[] }[] })
+      .filterGroups[0].filters[0];
+  assertEquals(filter.operator, "IN");
+  assertEquals(filter.values, ["acme.com", "beta.org", "gamma.io"]);
 });
 
-Deno.test("upsertCompany updates when a match exists (search then PATCH)", async () => {
-  const { hs, calls } = client([
-    { body: { results: [{ id: "comp-9", properties: { domain: "acme.com" } }] } }, // search → found
-    { body: { id: "comp-9" } }, // patch
+Deno.test("batchCreate posts to batch/create and maps results by idProperty", async () => {
+  const { hs, calls } = client([{
+    body: {
+      results: [
+        { id: "ct-1", properties: { email: "a@b.com" } },
+        { id: "ct-2", properties: { email: "c@d.com" } },
+      ],
+    },
+  }]);
+  const map = await hs.batchCreate("contacts", "email", [
+    { email: "a@b.com", firstname: "A" },
+    { email: "c@d.com", firstname: "C" },
   ]);
-  const res = await hs.upsertCompany("acme.com", { name: "Acme" });
-  assertEquals(res, { id: "comp-9", created: false });
-  assertEquals(calls[1].method, "PATCH");
-  assertStringIncludes(calls[1].url, "/crm/v3/objects/companies/comp-9");
-});
-
-Deno.test("upsertContact dedups by email; upsertDeal by unique_bb_id", async () => {
-  const c1 = client([{ body: { results: [] } }, { body: { id: "ct-1" } }]);
-  await c1.hs.upsertContact("a@b.com", { firstname: "A" });
-  const contactSearch =
-    (c1.calls[0].body as { filterGroups: { filters: { propertyName: string }[] }[] })
-      .filterGroups[0].filters[0].propertyName;
-  assertEquals(contactSearch, "email");
-
-  const c2 = client([{ body: { results: [] } }, { body: { id: "dl-1" } }]);
-  await c2.hs.upsertDeal("BB-1", { dealname: "X" });
-  const dealBody = c2.calls[1].body as { properties: { unique_bb_id: string } };
-  assertEquals(dealBody.properties.unique_bb_id, "BB-1");
+  assertEquals(map.get("a@b.com"), "ct-1");
+  assertEquals(map.get("c@d.com"), "ct-2");
+  assertStringIncludes(calls[0].url, "/crm/v3/objects/contacts/batch/create");
+  const inputs = (calls[0].body as { inputs: { properties: Record<string, string> }[] }).inputs;
+  assertEquals(inputs[0].properties.email, "a@b.com");
 });
 
 Deno.test("createAssociation uses the v4 default-association endpoint with PUT", async () => {

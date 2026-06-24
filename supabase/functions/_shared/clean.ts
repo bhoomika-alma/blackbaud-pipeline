@@ -61,13 +61,33 @@ export interface SplitNameResult {
   lastName: string;
 }
 
-/** Contact Name → first/last. First token = first name; the remainder = last name. */
-export function splitName(contactName: string | null | undefined): SplitNameResult {
+function capitalize(token: string): string {
+  return token.length === 0 ? token : token.charAt(0).toUpperCase() + token.slice(1);
+}
+
+/**
+ * Contact Name → first/last. First token = first name; the remainder = last name.
+ * If the name is blank, fall back to parsing the email local-part
+ * (e.g. `jane.doe@x.edu` → first "Jane", last "Doe").
+ */
+export function splitName(
+  contactName: string | null | undefined,
+  email?: string | null | undefined,
+): SplitNameResult {
   const cleaned = (contactName ?? "").trim().replace(/\s+/g, " ");
-  if (!cleaned) return { firstName: "", lastName: "" };
-  const idx = cleaned.indexOf(" ");
-  if (idx === -1) return { firstName: cleaned, lastName: "" };
-  return { firstName: cleaned.slice(0, idx), lastName: cleaned.slice(idx + 1) };
+  if (cleaned) {
+    const idx = cleaned.indexOf(" ");
+    if (idx === -1) return { firstName: cleaned, lastName: "" };
+    return { firstName: cleaned.slice(0, idx), lastName: cleaned.slice(idx + 1) };
+  }
+
+  const local = (email ?? "").trim().split("@")[0] ?? "";
+  const tokens = local.replace(/[._+\-]+/g, " ").trim().split(/\s+/).filter(Boolean).map(
+    capitalize,
+  );
+  if (tokens.length === 0) return { firstName: "", lastName: "" };
+  if (tokens.length === 1) return { firstName: tokens[0], lastName: "" };
+  return { firstName: tokens[0], lastName: tokens.slice(1).join(" ") };
 }
 
 /**

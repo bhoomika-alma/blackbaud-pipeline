@@ -23,6 +23,12 @@ export interface ImportSummary {
   updated: number
   skipped: number
   errors: { row_number: number; error: string }[]
+  companies_created?: number
+  companies_existing?: number
+  contacts_created?: number
+  contacts_existing?: number
+  deals_created?: number
+  deals_existing?: number
   duplicate_companies: DuplicateCompany[]
   total_rows: number
 }

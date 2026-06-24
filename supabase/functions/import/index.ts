@@ -57,9 +57,10 @@ Deno.serve(async (req) => {
     batchUpdateDeals: async (updates) => {
       await hubspot.batchUpdateDeals(updates);
     },
-    upsertCompany: (domain, properties) => hubspot.upsertCompany(domain, properties),
-    upsertContact: (email, properties) => hubspot.upsertContact(email, properties),
-    upsertDeal: (bbId, properties) => hubspot.upsertDeal(bbId, properties),
+    searchExisting: (objectType, propertyName, values) =>
+      hubspot.batchSearchIds(objectType, propertyName, values),
+    batchCreate: (objectType, idProperty, inputs) =>
+      hubspot.batchCreate(objectType, idProperty, inputs),
     createAssociation: (fromType, fromId, toType, toId) =>
       hubspot.createAssociation(fromType, fromId, toType, toId),
     updateRowResult: async (rowId, patch) => {

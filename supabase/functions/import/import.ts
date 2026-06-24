@@ -155,18 +155,22 @@ export function detectDuplicateCompanies(
   return duplicates;
 }
 
-export interface UpsertResult {
-  id: string;
-  created: boolean;
-}
-
 export interface ImportDeps {
   loadRows(importRunId: string): Promise<ImportRow[]>;
   setRunStatus(runId: string, status: string): Promise<void>;
   batchUpdateDeals(updates: { bbId: string; properties: Record<string, string> }[]): Promise<void>;
-  upsertCompany(domain: string, properties: Record<string, string>): Promise<UpsertResult>;
-  upsertContact(email: string, properties: Record<string, string>): Promise<UpsertResult>;
-  upsertDeal(bbId: string, properties: Record<string, string>): Promise<UpsertResult>;
+  /** Search existing records by a unique property → map propertyValue → object id. */
+  searchExisting(
+    objectType: string,
+    propertyName: string,
+    values: string[],
+  ): Promise<Map<string, string>>;
+  /** Batch-create records (each input includes idProperty) → map idValue → new id. */
+  batchCreate(
+    objectType: string,
+    idProperty: string,
+    inputs: Record<string, string>[],
+  ): Promise<Map<string, string>>;
   createAssociation(fromType: string, fromId: string, toType: string, toId: string): Promise<void>;
   updateRowResult(rowId: string, patch: Record<string, unknown>): Promise<void>;
   finalizeRun(runId: string, patch: Record<string, unknown>): Promise<void>;
@@ -185,6 +189,13 @@ export interface ImportSummary {
   updated: number;
   skipped: number;
   errors: { row_number: number; error: string }[];
+  // New-vs-existing breakdown discovered during the create path (search, then create).
+  companies_created: number;
+  companies_existing: number;
+  contacts_created: number;
+  contacts_existing: number;
+  deals_created: number;
+  deals_existing: number;
   duplicate_companies: DuplicateCompany[];
   total_rows: number;
 }
@@ -246,50 +257,156 @@ export async function runImport(deps: ImportDeps, input: ImportInput): Promise<I
     });
   }
 
-  // 2. NEW-create — company (by domain) + contact (by email) + deal + v4 associations.
+  // 2. NEW-create — batch SEARCH (learn existing vs new), then batch CREATE the
+  //    new ones (companies by domain, contacts by email, deals by unique_bb_id),
+  //    then associate. We deliberately do NOT upsert, so we can count new vs existing.
+  let companiesCreated = 0;
+  let companiesExisting = 0;
+  let contactsCreated = 0;
+  let contactsExisting = 0;
+  let dealsCreated = 0;
+  let dealsExisting = 0;
+
   const createRows = rows.filter((r) => actions.get(r.id) === "create");
-  for (const r of createRows) {
+  const createWithBbid = createRows.filter((r) => (r.bb_id ?? "").trim().length > 0);
+
+  for (const r of createRows.filter((r) => (r.bb_id ?? "").trim().length === 0)) {
+    skipped++;
+    await deps.updateRowResult(r.id, {
+      import_action: "skip",
+      import_error: "NEW row is missing unique_bb_id",
+    });
+  }
+
+  if (createWithBbid.length > 0) {
+    let companyIdByDomain = new Map<string, string>();
+    let contactIdByEmail = new Map<string, string>();
+    let dealIdByBbid = new Map<string, string>();
+    let createdDeals = new Map<string, string>();
+    let batchError: string | null = null;
+
     try {
-      const bbId = (r.bb_id ?? "").trim();
-      if (!bbId) throw new Error("NEW row is missing unique_bb_id");
-
-      let companyId: string | null = null;
-      const domain = finalDomain(r);
-      if (domain) {
-        const company = await deps.upsertCompany(domain, buildCompanyProperties(r, domain));
-        companyId = company.id;
-        companyByDomain.push({ domain, companyId });
+      // Companies — one input per distinct domain (first row supplies the name).
+      const companyInputByDomain = new Map<string, Record<string, string>>();
+      for (const r of createWithBbid) {
+        const d = finalDomain(r);
+        if (d && !companyInputByDomain.has(d)) {
+          companyInputByDomain.set(d, buildCompanyProperties(r, d));
+        }
       }
+      const domains = [...companyInputByDomain.keys()];
+      const existingCompanies = domains.length
+        ? await deps.searchExisting("companies", "domain", domains)
+        : new Map<string, string>();
+      const newDomains = domains.filter((d) => !existingCompanies.has(d));
+      const createdCompanies = newDomains.length
+        ? await deps.batchCreate(
+          "companies",
+          "domain",
+          newDomains.map((d) => companyInputByDomain.get(d) as Record<string, string>),
+        )
+        : new Map<string, string>();
+      companyIdByDomain = new Map([...existingCompanies, ...createdCompanies]);
+      companiesExisting = existingCompanies.size;
+      companiesCreated = createdCompanies.size;
 
-      let contactId: string | null = null;
-      const email = (r.contact_email ?? "").trim();
-      if (email) {
-        const contact = await deps.upsertContact(email, buildContactProperties(r));
-        contactId = contact.id;
+      // Contacts — one input per distinct email.
+      const contactInputByEmail = new Map<string, Record<string, string>>();
+      for (const r of createWithBbid) {
+        const e = (r.contact_email ?? "").trim();
+        if (e && !contactInputByEmail.has(e)) contactInputByEmail.set(e, buildContactProperties(r));
       }
+      const emails = [...contactInputByEmail.keys()];
+      const existingContacts = emails.length
+        ? await deps.searchExisting("contacts", "email", emails)
+        : new Map<string, string>();
+      const newEmails = emails.filter((e) => !existingContacts.has(e));
+      const createdContacts = newEmails.length
+        ? await deps.batchCreate(
+          "contacts",
+          "email",
+          newEmails.map((e) => contactInputByEmail.get(e) as Record<string, string>),
+        )
+        : new Map<string, string>();
+      contactIdByEmail = new Map([...existingContacts, ...createdContacts]);
+      contactsExisting = existingContacts.size;
+      contactsCreated = createdContacts.size;
 
-      const deal = await deps.upsertDeal(
-        bbId,
-        buildCreateDealProperties(r, pipelineIdFor(r, input.pipelineIds)),
-      );
-      if (companyId) await deps.createAssociation("deal", deal.id, "company", companyId);
-      if (contactId) await deps.createAssociation("deal", deal.id, "contact", contactId);
-
-      created++;
-      await deps.updateRowResult(r.id, {
-        import_action: "create",
-        result_hs_deal_id: deal.id,
-        result_hs_company_id: companyId,
-        result_hs_contact_id: contactId,
-        imported_at: input.importedAt ?? null,
-        import_error: null,
-      });
+      // Deals — search by unique_bb_id (1:1 per row), create only the new ones.
+      const dealInputByBbid = new Map<string, Record<string, string>>();
+      for (const r of createWithBbid) {
+        const bb = (r.bb_id ?? "").trim();
+        dealInputByBbid.set(bb, buildCreateDealProperties(r, pipelineIdFor(r, input.pipelineIds)));
+      }
+      const bbids = [...dealInputByBbid.keys()];
+      const existingDeals = await deps.searchExisting("deals", "unique_bb_id", bbids);
+      const newBbids = bbids.filter((b) => !existingDeals.has(b));
+      createdDeals = newBbids.length
+        ? await deps.batchCreate(
+          "deals",
+          "unique_bb_id",
+          newBbids.map((b) => dealInputByBbid.get(b) as Record<string, string>),
+        )
+        : new Map<string, string>();
+      dealIdByBbid = new Map([...existingDeals, ...createdDeals]);
+      dealsExisting = existingDeals.size;
+      dealsCreated = createdDeals.size;
     } catch (error) {
-      errors.push({ row_number: r.row_number, error: errorMessage(error) });
-      await deps.updateRowResult(r.id, {
-        import_action: "error",
-        import_error: errorMessage(error),
-      });
+      batchError = errorMessage(error);
+    }
+
+    if (batchError) {
+      for (const r of createWithBbid) {
+        errors.push({ row_number: r.row_number, error: batchError });
+        await deps.updateRowResult(r.id, { import_action: "error", import_error: batchError });
+      }
+    } else {
+      for (const r of createWithBbid) {
+        const bb = (r.bb_id ?? "").trim();
+        const dealId = dealIdByBbid.get(bb) ?? null;
+        const domain = finalDomain(r);
+        const companyId = domain ? companyIdByDomain.get(domain) ?? null : null;
+        if (domain && companyId) companyByDomain.push({ domain, companyId });
+        const email = (r.contact_email ?? "").trim();
+        const contactId = email ? contactIdByEmail.get(email) ?? null : null;
+
+        if (!dealId) {
+          errors.push({ row_number: r.row_number, error: "Deal was not created" });
+          await deps.updateRowResult(r.id, {
+            import_action: "error",
+            import_error: "Deal was not created",
+          });
+          continue;
+        }
+        if (!createdDeals.has(bb)) {
+          // Already existed in HubSpot (matched by unique_bb_id) — don't recreate.
+          skipped++;
+          await deps.updateRowResult(r.id, {
+            import_action: "skip",
+            result_hs_deal_id: dealId,
+            import_error: "Deal already exists in HubSpot (matched by unique_bb_id)",
+          });
+          continue;
+        }
+
+        let assocError: string | null = null;
+        try {
+          if (companyId) await deps.createAssociation("deal", dealId, "company", companyId);
+          if (contactId) await deps.createAssociation("deal", dealId, "contact", contactId);
+        } catch (error) {
+          assocError = `Association failed: ${errorMessage(error)}`;
+          errors.push({ row_number: r.row_number, error: assocError });
+        }
+        created++;
+        await deps.updateRowResult(r.id, {
+          import_action: "create",
+          result_hs_deal_id: dealId,
+          result_hs_company_id: companyId,
+          result_hs_contact_id: contactId,
+          imported_at: input.importedAt ?? null,
+          import_error: assocError,
+        });
+      }
     }
   }
 
@@ -307,6 +424,12 @@ export async function runImport(deps: ImportDeps, input: ImportInput): Promise<I
     updated,
     skipped,
     errors,
+    companies_created: companiesCreated,
+    companies_existing: companiesExisting,
+    contacts_created: contactsCreated,
+    contacts_existing: contactsExisting,
+    deals_created: dealsCreated,
+    deals_existing: dealsExisting,
     duplicate_companies: duplicateCompanies,
     total_rows: rows.length,
   };

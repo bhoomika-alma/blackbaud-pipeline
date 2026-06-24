@@ -25,17 +25,31 @@ export type FieldKey =
 
 export type ColumnMapping = Partial<Record<FieldKey, string>>;
 
-// Normalized (lowercase, single-spaced) header aliases per field.
+// Normalized (lowercase, punctuation-stripped, single-spaced) header aliases per
+// field. The real Blackbaud export headers (§1 of BUILD_SPEC) come first.
 const COLUMN_ALIASES: Record<FieldKey, string[]> = {
-  bb_id: ["unique bb id", "bb id", "bbid", "blackbaud id", "unique blackbaud id"],
+  bb_id: ["opportunity id", "unique bb id", "bb id", "bbid", "blackbaud id", "unique blackbaud id"],
   account_name: ["account name", "account", "company name", "company", "organization name"],
-  contact_name: ["contact name", "contact", "full name", "name"],
+  contact_name: [
+    "opportunity sourced contact",
+    "contact name",
+    "contact",
+    "full name",
+    "name",
+  ],
   contact_email: ["contact email", "email", "email address"],
   website: ["website", "web site", "url", "company website"],
   stage: ["stage", "deal stage", "pipeline stage"],
   region: ["region", "geo", "geography", "country"],
   vertical: ["vertical", "segment", "market", "industry"],
-  arr: ["arr", "amount", "annual recurring revenue", "deal amount"],
+  arr: [
+    "annual recurring amount converted",
+    "annual recurring amount",
+    "arr",
+    "amount",
+    "annual recurring revenue",
+    "deal amount",
+  ],
   created_date: ["created date", "create date", "created", "created on"],
   close_date: ["close date", "expected close date", "closed date", "close"],
   last_stage_change_date: ["last stage change date", "stage change date", "last stage change"],
@@ -66,7 +80,10 @@ export const REQUIRED_FIELDS: FieldKey[] = [
 ];
 
 function normalizeHeader(header: string): string {
-  return header.toLowerCase().trim().replace(/[_\s]+/g, " ");
+  // Lowercase and collapse any run of non-alphanumerics to a single space, so
+  // "Contact: Email" → "contact email" and "Annual Recurring Amount (converted)"
+  // → "annual recurring amount converted".
+  return header.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
 export function buildColumnMapping(headers: string[]): ColumnMapping {
@@ -151,7 +168,7 @@ export function buildCleanedRow(
 
   const website = get("website");
   const { domain, flagged } = cleanDomain(website);
-  const { firstName, lastName } = splitName(get("contact_name"));
+  const { firstName, lastName } = splitName(get("contact_name"), get("contact_email"));
   const stage = get("stage");
   const region = get("region");
   const vertical = get("vertical");

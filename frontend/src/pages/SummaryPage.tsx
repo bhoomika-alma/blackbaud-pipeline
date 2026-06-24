@@ -61,6 +61,41 @@ export default function SummaryPage() {
         </div>
       </div>
 
+      {summary && (
+        <>
+          <h3>New vs existing in HubSpot</h3>
+          <p className="muted">
+            Found via batch search before creating — we never blind-upsert, so these counts are exact.
+          </p>
+          <div className="cards">
+            <div className="card">
+              <div className="card__n">
+                {summary.deals_created ?? 0}
+                <span className="card__sub"> / {summary.deals_existing ?? 0}</span>
+              </div>
+              <div className="card__label">Deals</div>
+              <div className="card__hint">created / already existed</div>
+            </div>
+            <div className="card">
+              <div className="card__n">
+                {summary.companies_created ?? 0}
+                <span className="card__sub"> / {summary.companies_existing ?? 0}</span>
+              </div>
+              <div className="card__label">Companies</div>
+              <div className="card__hint">created / already existed</div>
+            </div>
+            <div className="card">
+              <div className="card__n">
+                {summary.contacts_created ?? 0}
+                <span className="card__sub"> / {summary.contacts_existing ?? 0}</span>
+              </div>
+              <div className="card__label">Contacts</div>
+              <div className="card__hint">created / already existed</div>
+            </div>
+          </div>
+        </>
+      )}
+
       {duplicates.length > 0 && (
         <div className="error">
           <strong>Possible duplicate companies (flag for merge):</strong>

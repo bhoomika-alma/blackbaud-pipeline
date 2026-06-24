@@ -15,11 +15,6 @@ export interface HubSpotObject {
 
 export type HubSpotDeal = HubSpotObject;
 
-export interface UpsertResult {
-  id: string;
-  created: boolean;
-}
-
 export interface DealUpdate {
   bbId: string;
   properties: Record<string, string>;
@@ -164,48 +159,57 @@ export class HubSpotClient {
     return results;
   }
 
-  private async upsertByProperty(
+  /**
+   * Batch-search existing records by a unique property (e.g. domain / email /
+   * unique_bb_id), `propertyName IN [values]`, ≤100 per request + paginated.
+   * Returns a map of propertyValue → object id for the records that exist.
+   * Used to learn which records are NEW vs EXISTING before creating.
+   */
+  async batchSearchIds(
     objectType: string,
     propertyName: string,
-    value: string,
-    properties: Record<string, string>,
-  ): Promise<UpsertResult> {
-    const matches = await this.searchAll(
-      objectType,
-      [{ propertyName, operator: "EQ", value }],
-      [propertyName],
-    );
-    if (matches.length > 0) {
-      const id = matches[0].id;
-      const updated = await this.request<HubSpotObject>(
-        `/crm/v3/objects/${objectType}/${id}`,
-        { method: "PATCH", body: JSON.stringify({ properties }) },
+    values: string[],
+  ): Promise<Map<string, string>> {
+    const found = new Map<string, string>();
+    const unique = [...new Set(values.map((v) => v?.trim()).filter((v) => !!v))] as string[];
+    for (const group of chunk(unique, 100)) {
+      const results = await this.searchAll(
+        objectType,
+        [{ propertyName, operator: "IN", values: group }],
+        [propertyName],
       );
-      return { id: updated.id ?? id, created: false };
+      for (const obj of results) {
+        const key = obj.properties[propertyName];
+        if (key && obj.id) found.set(key, obj.id);
+      }
     }
-    const created = await this.request<HubSpotObject>(
-      `/crm/v3/objects/${objectType}`,
-      { method: "POST", body: JSON.stringify({ properties }) },
-    );
-    return { id: created.id, created: true };
+    return found;
   }
 
-  /** Upsert a company, deduped by domain. */
-  async upsertCompany(domain: string, properties: Record<string, string>): Promise<UpsertResult> {
-    return await this.upsertByProperty("companies", "domain", domain, { domain, ...properties });
-  }
-
-  /** Upsert a contact, deduped by email. */
-  async upsertContact(email: string, properties: Record<string, string>): Promise<UpsertResult> {
-    return await this.upsertByProperty("contacts", "email", email, { email, ...properties });
-  }
-
-  /** Upsert a deal, deduped by unique_bb_id. */
-  async upsertDeal(bbId: string, properties: Record<string, string>): Promise<UpsertResult> {
-    return await this.upsertByProperty("deals", "unique_bb_id", bbId, {
-      unique_bb_id: bbId,
-      ...properties,
-    });
+  /**
+   * Batch-create records (≤100 per request). Each input is a flat properties
+   * object that MUST include `idProperty`. Returns idPropertyValue → new id.
+   */
+  async batchCreate(
+    objectType: string,
+    idProperty: string,
+    inputs: Record<string, string>[],
+  ): Promise<Map<string, string>> {
+    const created = new Map<string, string>();
+    for (const group of chunk(inputs, 100)) {
+      const res = await this.request<BatchResult>(
+        `/crm/v3/objects/${objectType}/batch/create`,
+        {
+          method: "POST",
+          body: JSON.stringify({ inputs: group.map((properties) => ({ properties })) }),
+        },
+      );
+      for (const obj of res.results) {
+        const key = obj.properties?.[idProperty];
+        if (key && obj.id) created.set(key, obj.id);
+      }
+    }
+    return created;
   }
 
   /** Create a v4 default association between two objects. */

@@ -34,6 +34,37 @@ Deno.test("validateColumns: reports missing required columns", () => {
   assertEquals(result.missing, ["Unique BB ID", "Stage", "Region", "Vertical"]);
 });
 
+Deno.test("buildColumnMapping: maps the real Blackbaud export headers (§1)", () => {
+  const mapping = buildColumnMapping([
+    "Opportunity ID",
+    "Account Name",
+    "Opportunity Sourced Contact",
+    "Contact: Email",
+    "Website",
+    "Stage",
+    "Region",
+    "Vertical",
+    "Annual Recurring Amount (converted)",
+    "Created Date",
+    "Close Date",
+    "Last Stage Change Date",
+  ]);
+  assertEquals(mapping.bb_id, "Opportunity ID");
+  assertEquals(mapping.contact_name, "Opportunity Sourced Contact");
+  assertEquals(mapping.contact_email, "Contact: Email");
+  assertEquals(mapping.arr, "Annual Recurring Amount (converted)");
+  assertEquals(
+    validateColumns([
+      "Opportunity ID",
+      "Account Name",
+      "Stage",
+      "Region",
+      "Vertical",
+    ]).ok,
+    true,
+  );
+});
+
 Deno.test("buildColumnMapping: matches aliases case/underscore-insensitively", () => {
   const mapping = buildColumnMapping([
     "BB_ID",

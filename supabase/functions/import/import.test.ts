@@ -9,7 +9,6 @@ import {
   type ImportRow,
   resolveImportAction,
   runImport,
-  type UpsertResult,
 } from "./import.ts";
 
 const PIPELINE_IDS: Record<PipelineKey, string> = {
@@ -157,15 +156,24 @@ Deno.test("detectDuplicateCompanies flags domains with multiple company ids", ()
 
 // ─────────────────────────────── runImport ───────────────────────────────
 
-function mockDeps(rows: ImportRow[], companyIdSequence: string[] = ["comp-1"]) {
-  let companyIdx = 0;
+interface ExistingMaps {
+  companies?: Record<string, string>;
+  contacts?: Record<string, string>;
+  deals?: Record<string, string>;
+}
+
+function mockDeps(rows: ImportRow[], existing: ExistingMaps = {}) {
   const captured = {
     status: [] as string[],
     batchUpdates: [] as { bbId: string; properties: Record<string, string> }[][],
+    creates: [] as { objectType: string; inputs: Record<string, string>[] }[],
     rowResults: [] as { id: string; patch: Record<string, unknown> }[],
     associations: [] as string[],
     finalize: null as Record<string, unknown> | null,
   };
+  const counters: Record<string, number> = {};
+  const byType = existing as Record<string, Record<string, string>>;
+
   const deps: ImportDeps = {
     loadRows: () => Promise.resolve(rows),
     setRunStatus: (_id, status) => {
@@ -176,13 +184,17 @@ function mockDeps(rows: ImportRow[], companyIdSequence: string[] = ["comp-1"]) {
       captured.batchUpdates.push(updates);
       return Promise.resolve();
     },
-    upsertCompany: (): Promise<UpsertResult> => {
-      const id = companyIdSequence[Math.min(companyIdx, companyIdSequence.length - 1)];
-      companyIdx++;
-      return Promise.resolve({ id, created: true });
+    searchExisting: (objectType, _propertyName, _values) =>
+      Promise.resolve(new Map(Object.entries(byType[objectType] ?? {}))),
+    batchCreate: (objectType, idProperty, inputs) => {
+      captured.creates.push({ objectType, inputs });
+      const out = new Map<string, string>();
+      for (const input of inputs) {
+        counters[objectType] = (counters[objectType] ?? 0) + 1;
+        out.set(input[idProperty], `${objectType}-${counters[objectType]}`);
+      }
+      return Promise.resolve(out);
     },
-    upsertContact: () => Promise.resolve({ id: "ct-1", created: true }),
-    upsertDeal: () => Promise.resolve({ id: "deal-1", created: true }),
     createAssociation: (fromType, fromId, toType, toId) => {
       captured.associations.push(`${fromType}:${fromId}->${toType}:${toId}`);
       return Promise.resolve();
@@ -222,13 +234,16 @@ Deno.test("runImport: updates existing, creates new, skips hold; writes summary"
     }),
     makeRow({ id: "r3", row_number: 3, classification: "hold" }),
   ];
-  const { deps, captured } = mockDeps(rows);
+  const { deps, captured } = mockDeps(rows); // nothing exists → all new
   const result = await runImport(deps, { importRunId: "run-1", pipelineIds: PIPELINE_IDS });
 
   assertEquals(result.summary.created, 1);
   assertEquals(result.summary.updated, 1);
   assertEquals(result.summary.skipped, 1);
   assertEquals(result.summary.total_rows, 3);
+  assertEquals(result.summary.companies_created, 1);
+  assertEquals(result.summary.contacts_created, 1);
+  assertEquals(result.summary.deals_created, 1);
 
   // existing → one batch update, matched by bb_id, no amount
   assertEquals(captured.batchUpdates.length, 1);
@@ -237,11 +252,10 @@ Deno.test("runImport: updates existing, creates new, skips hold; writes summary"
 
   // new → deal+company+contact associations (2)
   assertEquals(captured.associations, [
-    "deal:deal-1->company:comp-1",
-    "deal:deal-1->contact:ct-1",
+    "deal:deals-1->company:companies-1",
+    "deal:deals-1->contact:contacts-1",
   ]);
 
-  // run lifecycle + finalize
   assertEquals(captured.status, ["importing"]);
   assertEquals(captured.finalize?.status, "completed");
   assertEquals(captured.finalize?.approved_count, 2);
@@ -249,39 +263,36 @@ Deno.test("runImport: updates existing, creates new, skips hold; writes summary"
 
   const createResult = captured.rowResults.find((r) => r.id === "r2")?.patch;
   assertEquals(createResult?.import_action, "create");
-  assertEquals(createResult?.result_hs_deal_id, "deal-1");
-  assertEquals(createResult?.result_hs_company_id, "comp-1");
+  assertEquals(createResult?.result_hs_deal_id, "deals-1");
+  assertEquals(createResult?.result_hs_company_id, "companies-1");
 });
 
-Deno.test("runImport: flags duplicate companies for the same domain", async () => {
+Deno.test("runImport: counts existing vs new (company exists, deal is new)", async () => {
   const rows = [
     makeRow({
       id: "r1",
       row_number: 1,
       classification: "new",
-      bb_id: "N1",
-      domain: "dup.com",
-      account_name: "Dup A",
-    }),
-    makeRow({
-      id: "r2",
-      row_number: 2,
-      classification: "new",
-      bb_id: "N2",
-      domain: "dup.com",
-      account_name: "Dup B",
+      bb_id: "N",
+      account_name: "Acme",
+      domain: "acme.com",
+      contact_email: "a@acme.com",
+      derived_pipeline: "Blackbaud Canada",
+      deal_name: "Acme - Blackbaud Canada",
     }),
   ];
-  const { deps, captured } = mockDeps(rows, ["comp-1", "comp-2"]);
+  // Company already exists in HubSpot; contact + deal are new.
+  const { deps, captured } = mockDeps(rows, { companies: { "acme.com": "comp-existing" } });
   const result = await runImport(deps, { importRunId: "run-1", pipelineIds: PIPELINE_IDS });
-  assertEquals(result.summary.duplicate_companies, [{
-    domain: "dup.com",
-    companyIds: ["comp-1", "comp-2"],
-  }]);
-  assertEquals(
-    (captured.finalize?.summary as { duplicate_companies: unknown[] }).duplicate_companies.length,
-    1,
-  );
+
+  assertEquals(result.summary.companies_existing, 1);
+  assertEquals(result.summary.companies_created, 0);
+  assertEquals(result.summary.contacts_created, 1);
+  assertEquals(result.summary.deals_created, 1);
+  // only contacts + deals were created (company reused), so 2 batchCreate calls
+  assertEquals(captured.creates.map((c) => c.objectType).sort(), ["contacts", "deals"]);
+  // deal associates to the EXISTING company id
+  assertEquals(captured.associations[0], "deal:deals-1->company:comp-existing");
 });
 
 Deno.test("runImport: review-confirm without bb_id is skipped with an error note", async () => {
