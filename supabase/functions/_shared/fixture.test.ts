@@ -87,17 +87,12 @@ Deno.test("fixture: classification by bb_id lookup + name search", () => {
       .classification,
     "internal",
   );
-  // Not found + inactive stage → HOLD.
+  // Not found + 0 name matches → NEW (no stage gate; early stages included).
   assertEquals(
-    classifyRow(asClassifyRow(null, "Discover", "x"), ctx(), [], null).classification,
-    "hold",
-  );
-  // Not found + active + no name match → NEW.
-  assertEquals(
-    classifyRow(asClassifyRow(null, "Propose", "Acme - X"), ctx(), [], 0).classification,
+    classifyRow(asClassifyRow(null, "Discover", "x"), ctx(), [], 0).classification,
     "new",
   );
-  // Not found + active + 1 name match → REVIEW.
+  // Not found + 1 name match → REVIEW.
   assertEquals(
     classifyRow(asClassifyRow(null, "Propose", "Acme - X"), ctx(), [], 1).classification,
     "review",

@@ -44,9 +44,10 @@ Each row is searched directly in HubSpot by its `unique_bb_id` deal property.
     (HigherEd / k12 / Canada / England)? → **EXISTING** (update). Any other pipeline
     (Inbound / Outbound / ABM / CS) → **INTERNAL** (skip). If the BBID matches 2+ deals
     → **REVIEW** (duplicate deal for the same BB ID).
-  - **No** — stage ∈ {Demonstrate, Propose, Negotiate}? If not → **HOLD** (too early).
-    Otherwise search by exact deal name: 0 matches → **NEW** (create); 1 → **REVIEW**
-    (confirm existing); 2+ → **REVIEW** (ambiguous).
+  - **No** — search by exact deal name: 0 matches → **NEW** (create); 1 → **REVIEW**
+    (confirm existing); 2+ → **REVIEW** (ambiguous). There is **no stage gate** — a deal
+    not found by BBID is a NEW candidate regardless of stage (Discover & Access / Engage
+    included), so the **HOLD** bucket is no longer produced.
 
 The Blackbaud pipeline IDs come from `HUBSPOT_PIPELINE_*` (see `.env.example`).
 

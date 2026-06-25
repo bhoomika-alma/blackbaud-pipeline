@@ -68,25 +68,22 @@ Deno.test("classifyRow: bb_id matches 2+ deals → REVIEW duplicate (cat 4)", ()
   assertEquals(result.hs_deal_id, "h1");
 });
 
-Deno.test("classifyRow: not found + inactive stage → HOLD", () => {
-  assertEquals(classifyRow(row({ stage: "Discover" }), ctx(), [], null).classification, "hold");
-});
-
-Deno.test("classifyRow: not found + active + 0 name matches → NEW", () => {
-  const result = classifyRow(row({ stage: "Propose", deal_name: "X - P" }), ctx(), [], 0);
+Deno.test("classifyRow: not found + 0 name matches → NEW (any stage, no gate)", () => {
+  // Early stage no longer holds — a not-found deal is a NEW candidate regardless.
+  const result = classifyRow(row({ stage: "Discover", deal_name: "X - P" }), ctx(), [], 0);
   assertEquals(result.classification, "new");
   assertEquals(result.matched_by, "none");
 });
 
-Deno.test("classifyRow: not found + active + 1 name match → REVIEW (cat 2)", () => {
-  const result = classifyRow(row({ stage: "Propose", deal_name: "X - P" }), ctx(), [], 1);
+Deno.test("classifyRow: not found + 1 name match → REVIEW (cat 2)", () => {
+  const result = classifyRow(row({ stage: "Discover", deal_name: "X - P" }), ctx(), [], 1);
   assertEquals(result.classification, "review");
   assertEquals(result.matched_by, "deal_name");
   assertEquals(result.edgeCase?.category, 2);
 });
 
-Deno.test("classifyRow: not found + active + 2+ name matches → REVIEW (cat 3)", () => {
-  const result = classifyRow(row({ stage: "Negotiate", deal_name: "X - P" }), ctx(), [], 3);
+Deno.test("classifyRow: not found + 2+ name matches → REVIEW (cat 3)", () => {
+  const result = classifyRow(row({ stage: "Discover", deal_name: "X - P" }), ctx(), [], 3);
   assertEquals(result.classification, "review");
   assertEquals(result.match_count, 3);
   assertEquals(result.edgeCase?.category, 3);
@@ -94,17 +91,16 @@ Deno.test("classifyRow: not found + active + 2+ name matches → REVIEW (cat 3)"
 
 // ───────────────────────────── needsNameSearch ─────────────────────────────
 
-Deno.test("needsNameSearch: only when bb_id not found, stage active, name present", () => {
+Deno.test("needsNameSearch: when bb_id not found and a deal name is present (any stage)", () => {
   // found by bb_id → no name search
   assertEquals(
     needsNameSearch(row({ bb_id: "A", stage: "Propose", deal_name: "n" }), [deal("CA")]),
     false,
   );
-  // inactive stage → no
-  assertEquals(needsNameSearch(row({ stage: "Discover", deal_name: "n" }), []), false);
   // no deal name → no
   assertEquals(needsNameSearch(row({ stage: "Propose", deal_name: "" }), []), false);
-  // not found + active + name → yes
+  // not found + name present → yes, regardless of stage (early stages included)
+  assertEquals(needsNameSearch(row({ stage: "Discover", deal_name: "n" }), []), true);
   assertEquals(needsNameSearch(row({ stage: "Propose", deal_name: "Acme - P" }), []), true);
 });
 
@@ -164,20 +160,20 @@ Deno.test("runClassify: routes each row by bb_id lookup + name search, rolls up 
       EXI: [deal("HE", "h-exi")], // Blackbaud pipeline → existing
       INT: [deal("999", "h-int")], // internal pipeline → internal
     },
-    nameCounts: { "N - P": 0 },
+    nameCounts: { "N - P": 0, "D - P": 0 },
   });
   const result = await runClassify(deps, INPUT);
 
   assertEquals(result.counts.existing, 1);
   assertEquals(result.counts.internal, 1);
-  assertEquals(result.counts.new, 1); // r3 (not found, active, 0 name matches)
-  assertEquals(result.counts.hold, 1); // r4 (not found, inactive stage)
+  assertEquals(result.counts.new, 2); // r3 + r4 (not found, 0 name matches — no stage gate)
+  assertEquals(result.counts.hold, 0); // HOLD is no longer produced
 
   // a single batch bb_id search covering every row with a bb_id
   assertEquals(captured.bbidSearches.length, 1);
   assertEquals(captured.bbidSearches[0], ["EXI", "INT", "NEW", "ERL"]);
-  // only r3 reached the name search (found + held rows are skipped)
-  assertEquals(captured.nameSearches, ["N - P"]);
+  // both not-found rows reach the name search now (early-stage included)
+  assertEquals(captured.nameSearches, ["N - P", "D - P"]);
 
   // EXISTING row persists the real matched deal id + pipeline
   const r1Patch = captured.rowUpdates.find((u) => u.id === "r1")?.patch;
@@ -188,7 +184,7 @@ Deno.test("runClassify: routes each row by bb_id lookup + name search, rolls up 
   const final = captured.runUpdates.at(-1);
   assertEquals(final?.status, "classified");
   assertEquals(final?.existing_count, 1);
-  assertEquals(final?.new_count, 1);
+  assertEquals(final?.new_count, 2);
 });
 
 Deno.test("runClassify: domain_flagged adds a data-quality edge case", async () => {

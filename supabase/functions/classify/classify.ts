@@ -5,15 +5,14 @@
 //       · deal in a Blackbaud pipeline (HigherEd / k12 / Canada / England)
 //         → EXISTING (update). In any other pipeline → INTERNAL (skip).
 //   - BBID found in 2+ deals → REVIEW (duplicate deal for the same BB ID).
-//   - BBID not found:
-//       · stage ∉ {Demonstrate, Propose, Negotiate} → HOLD (too early).
-//       · otherwise an exact deal-name search decides:
-//           0 matches → NEW (create); 1 → REVIEW (confirm existing); 2+ → REVIEW (ambiguous).
+//   - BBID not found → an exact deal-name search decides:
+//       0 matches → NEW (create); 1 → REVIEW (confirm existing); 2+ → REVIEW (ambiguous).
+//
+// There is NO stage gate: a deal not found by BBID is a NEW candidate regardless
+// of its stage (Discover & Access / Engage included), so HOLD is never produced.
 //
 // `classifyRow` is pure; `runClassify` orchestrates the batch bb_id search + the
 // name search + persistence via injected I/O so it is unit-testable.
-
-import { ACTIVE_STAGES } from "../_shared/clean.ts";
 
 export type Classification = "new" | "existing" | "internal" | "hold" | "review";
 export type MatchedBy = "none" | "bb_id" | "deal_name";
@@ -55,29 +54,14 @@ export interface ClassifyContext {
   blackbaudPipelines: Set<string>;
 }
 
-function isActiveStage(row: ClassifyRow): boolean {
-  return ACTIVE_STAGES.includes((row.stage ?? "").trim().toLowerCase());
-}
-
 /**
  * True when a row reaches the name-search branch: BBID not found in HubSpot AND
- * the stage is active AND there is a deal name to search on.
+ * there is a deal name to search on. (A not-found row with no deal name falls
+ * straight through to NEW.)
  */
 export function needsNameSearch(row: ClassifyRow, matches: DealMatch[]): boolean {
   if (matches.length > 0) return false; // found by bb_id
-  if (!isActiveStage(row)) return false;
   return (row.deal_name ?? "").trim().length > 0;
-}
-
-function hold(): ClassificationResult {
-  return {
-    classification: "hold",
-    matched_by: "none",
-    hs_deal_id: null,
-    matched_pipeline: null,
-    match_count: 0,
-    edgeCase: null,
-  };
 }
 
 /**
@@ -122,9 +106,7 @@ export function classifyRow(
     };
   }
 
-  // ── BBID not found ──
-  if (!isActiveStage(row)) return hold();
-
+  // ── BBID not found → exact deal-name search decides NEW vs REVIEW ──
   const count = nameMatchCount ?? 0;
   if (count === 0) {
     return {

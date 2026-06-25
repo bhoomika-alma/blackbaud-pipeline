@@ -80,9 +80,8 @@ Keep these as a `BB_PIPELINES` constant in code (small + stable; no pipelines ta
   - **Yes** →
     - **exactly 1 deal** → is it in a Blackbaud pipeline (§2.2)? **Yes → EXISTING (Update).** **No → INTERNAL (Skip).**
     - **2+ deals share the BBID** → **REVIEW** (duplicate deal for the same BBID — edge case 4).
-  - **No** → is `Stage` ∈ {Demonstrate, Propose, Negotiate}?
-    - **No** (Discover & Access / Engage) → **HOLD** (too early; don't import).
-    - **Yes** → Search by **Deal Name (exact)**: `0` → **NEW (Create)**; `1` → **REVIEW (confirm existing)**; `2+` → **REVIEW (ambiguous)**.
+  - **No** → Search by **Deal Name (exact)**: `0` → **NEW (Create)**; `1` → **REVIEW (confirm existing)**; `2+` → **REVIEW (ambiguous)**.
+    - **No stage gate:** a deal not found by BBID is a NEW candidate regardless of stage (Discover & Access / Engage included), so **HOLD** is no longer produced. Stage still drives the Demonstrate Stage Date in Phase B.
 - Persist `classification`, `matched_by`, `hs_deal_id`, `matched_pipeline`, `match_count`. Roll up `new_count` / `existing_count` / `review_count` + `edge_cases` onto `import_runs`.
 
 ### PHASE D — Results dashboard (Screen 2)
@@ -151,7 +150,7 @@ See the exact column maps in §4. Two outputs:
 
 ## 5. RULES & EDGE KNOWLEDGE
 - **Amounts:** ARR is imported **only for NEW deals**; existing-deal amounts are **never updated** (AEs manage them). Blackbaud reports a partial figure; Aakash/Maaz set the real full value, which arrives in the ARR field as-stated USD.
-- **Stages:** Demonstrate / Propose / Negotiate = AEs involved = a real pipeline deal (import). Discover & Access / Engage = too early (HOLD). Closed Won/Lost no longer appear.
+- **Stages:** Demonstrate / Propose / Negotiate = AEs involved; Discover & Access / Engage = earlier. Stage drives the Demonstrate Stage Date (Phase B) but is **not** a classification gate — a deal not found by BBID is imported as NEW regardless of stage (HOLD is no longer produced). Closed Won/Lost no longer appear.
 - **Internal deals:** moved into Inbound/Outbound (or other non-BB pipelines) by AEs — already managed, so SKIP (don't overwrite).
 - **`region` + `vertical`** drive pipeline derivation (and are also imported as deal properties). **`last_stage_change_date`** is the source for the Demonstrate Stage Date (and the change-detection signal).
 
