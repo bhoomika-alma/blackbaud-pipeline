@@ -37,10 +37,18 @@ functions write via the service-role key.
 
 ### How rows are classified (Phase C)
 
-- Deal found in HubSpot by `unique_bb_id`?
-  - **Yes**, and it's in a Blackbaud pipeline → **EXISTING** (update). Otherwise → **INTERNAL** (skip).
-  - **No**, and stage ∉ {Demonstrate, Propose, Negotiate} → **HOLD**. Otherwise search by exact deal name:
-    0 matches → **NEW** (create); 1 → **REVIEW** (confirm); 2+ → **REVIEW** (ambiguous).
+Each row is searched directly in HubSpot by its `unique_bb_id` deal property.
+
+- **BBID found?**
+  - **Yes** — is the matched deal's `pipeline` one of the four Blackbaud pipelines
+    (HigherEd / k12 / Canada / England)? → **EXISTING** (update). Any other pipeline
+    (Inbound / Outbound / ABM / CS) → **INTERNAL** (skip). If the BBID matches 2+ deals
+    → **REVIEW** (duplicate deal for the same BB ID).
+  - **No** — stage ∈ {Demonstrate, Propose, Negotiate}? If not → **HOLD** (too early).
+    Otherwise search by exact deal name: 0 matches → **NEW** (create); 1 → **REVIEW**
+    (confirm existing); 2+ → **REVIEW** (ambiguous).
+
+The Blackbaud pipeline IDs come from `HUBSPOT_PIPELINE_*` (see `.env.example`).
 
 ### The 7 review edge cases (Phase E)
 

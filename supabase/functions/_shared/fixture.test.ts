@@ -8,7 +8,7 @@ import {
   type ClassifyContext,
   type ClassifyRow,
   classifyRow,
-  type ListKeys,
+  type DealMatch,
 } from "../classify/classify.ts";
 
 const csvText = await Deno.readTextFile(
@@ -59,50 +59,47 @@ function asClassifyRow(bbId: string | null, stage: string, dealName: string): Cl
     bb_id: bbId,
     stage,
     deal_name: dealName,
-    created_date: null,
     domain: null,
     domain_flagged: false,
   };
 }
 
-function keys(bbids: string[] = [], names: string[] = []): ListKeys {
-  return { bbids: new Set(bbids), names: new Set(names.map((n) => n.toLowerCase())) };
-}
+const BB_PIPELINES = new Set(["HE", "K12", "CA", "EN"]);
 
 function ctx(over: Partial<ClassifyContext> = {}): ClassifyContext {
-  return { internal: keys(), existing: keys(), lastImportDate: null, ...over };
+  return { blackbaudPipelines: BB_PIPELINES, ...over };
 }
 
-Deno.test("fixture: classification over the two lists", () => {
-  // In the internal-moved list → INTERNAL.
+function deal(pipeline: string | null): DealMatch {
+  return { id: "d1", pipeline };
+}
+
+Deno.test("fixture: classification by bb_id lookup + name search", () => {
+  // Found by bb_id, in a Blackbaud pipeline → EXISTING.
   assertEquals(
-    classifyRow(asClassifyRow("BB9", "Demonstrate", "x"), ctx({ internal: keys(["BB9"]) }), null)
-      .classification,
-    "internal",
-  );
-  // In the BB Pipeline Deals list → EXISTING.
-  assertEquals(
-    classifyRow(
-      asClassifyRow("BB1001", "Demonstrate", "x"),
-      ctx({ existing: keys(["BB1001"]) }),
-      null,
-    )
+    classifyRow(asClassifyRow("BB1001", "Demonstrate", "x"), ctx(), [deal("CA")], null)
       .classification,
     "existing",
   );
-  // Unmapped + inactive stage → HOLD.
+  // Found by bb_id, in a non-Blackbaud (internal) pipeline → INTERNAL.
   assertEquals(
-    classifyRow(asClassifyRow(null, "Discover", "x"), ctx(), null).classification,
+    classifyRow(asClassifyRow("BB9", "Demonstrate", "x"), ctx(), [deal("999")], null)
+      .classification,
+    "internal",
+  );
+  // Not found + inactive stage → HOLD.
+  assertEquals(
+    classifyRow(asClassifyRow(null, "Discover", "x"), ctx(), [], null).classification,
     "hold",
   );
-  // Unmapped + active + no name match → NEW.
+  // Not found + active + no name match → NEW.
   assertEquals(
-    classifyRow(asClassifyRow(null, "Propose", "Acme - X"), ctx(), 0).classification,
+    classifyRow(asClassifyRow(null, "Propose", "Acme - X"), ctx(), [], 0).classification,
     "new",
   );
-  // Unmapped + active + 1 name match → REVIEW.
+  // Not found + active + 1 name match → REVIEW.
   assertEquals(
-    classifyRow(asClassifyRow(null, "Propose", "Acme - X"), ctx(), 1).classification,
+    classifyRow(asClassifyRow(null, "Propose", "Acme - X"), ctx(), [], 1).classification,
     "review",
   );
 });

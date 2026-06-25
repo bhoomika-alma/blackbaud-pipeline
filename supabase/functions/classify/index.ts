@@ -2,15 +2,10 @@
 // Supabase service-role client into runClassify.
 
 import { createClient } from "@supabase/supabase-js";
-import { getConfig } from "../_shared/env.ts";
+import { blackbaudPipelineIds, getConfig } from "../_shared/env.ts";
 import { HubSpotClient } from "../_shared/hubspot.ts";
 import { errorMessage, handleOptions, json } from "../_shared/http.ts";
-import {
-  type ClassifyDeps,
-  type ClassifyRow,
-  latestBbImportDate,
-  runClassify,
-} from "./classify.ts";
+import { type ClassifyDeps, type ClassifyRow, type DealMatch, runClassify } from "./classify.ts";
 
 Deno.serve(async (req) => {
   const preflight = handleOptions(req);
@@ -37,25 +32,26 @@ Deno.serve(async (req) => {
   const supabase = createClient(config.supabaseUrl, config.supabaseServiceRoleKey, {
     auth: { persistSession: false },
   });
-  // Classification READS from production (lists, imports, lookups).
+  // Classification READS from production (deal lookups by bb_id + name).
   const hubspot = HubSpotClient.read(config);
-
-  const currentYear = new Date().getUTCFullYear();
 
   const deps: ClassifyDeps = {
     loadRows: async (runId) => {
       const { data, error } = await supabase
         .from("deal_rows")
-        .select("id,row_number,bb_id,stage,deal_name,created_date,domain,domain_flagged")
+        .select("id,row_number,bb_id,stage,deal_name,domain,domain_flagged")
         .eq("import_run_id", runId)
         .order("row_number", { ascending: true });
       if (error) throw new Error(`Failed to load deal_rows: ${error.message}`);
       return (data ?? []) as ClassifyRow[];
     },
-    getListKeys: (listName) => hubspot.getListDealKeys(listName),
-    getLastImportDate: async () => {
-      const imports = await hubspot.getRecentImports();
-      return latestBbImportDate(imports, currentYear);
+    searchDealsByBbid: async (bbIds) => {
+      const grouped = await hubspot.searchDealsByBbid(bbIds);
+      const out = new Map<string, DealMatch[]>();
+      for (const [bbId, deals] of grouped) {
+        out.set(bbId, deals.map((d) => ({ id: d.id, pipeline: d.properties["pipeline"] ?? null })));
+      }
+      return out;
     },
     searchByName: async (dealName) => (await hubspot.searchDealsByName(dealName)).length,
     updateRow: async (rowId, patch) => {
@@ -71,8 +67,7 @@ Deno.serve(async (req) => {
   try {
     const result = await runClassify(deps, {
       importRunId,
-      internalListName: config.lists.internal,
-      existingListName: config.lists.pipeline,
+      blackbaudPipelines: blackbaudPipelineIds(config),
     });
     return json(result, 200);
   } catch (error) {
