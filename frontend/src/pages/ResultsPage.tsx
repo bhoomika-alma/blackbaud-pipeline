@@ -47,7 +47,13 @@ export default function ResultsPage() {
   if (!run) return <p className="error">Import run not found.</p>
 
   // Category 1 ("new deal → confirm ARR") is routine, not a real edge case.
-  const realEdgeCount = (run.edge_cases ?? []).filter((e) => e.category !== 1).length
+  // Count distinct ROWS (you make one decision per row) — a row can carry more
+  // than one edge case (e.g. a name-match that's also domain-flagged), so this
+  // must match the per-row count shown on the Review screen.
+  const realEdgeRowIds = new Set(
+    (run.edge_cases ?? []).filter((e) => e.category !== 1).map((e) => e.row_id),
+  )
+  const realEdgeCount = realEdgeRowIds.size
 
   return (
     <section>
