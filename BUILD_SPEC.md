@@ -77,7 +77,9 @@ Keep these as a `BB_PIPELINES` constant in code (small + stable; no pipelines ta
 ### PHASE C — Classify each row
 - Search HubSpot deals by `unique_bb_id` (batched).
 - **FOUND?**
-  - **Yes** → is the matched deal in a Blackbaud pipeline (§2.2)? **Yes → EXISTING (Update).** **No → INTERNAL (Skip).**
+  - **Yes** →
+    - **exactly 1 deal** → is it in a Blackbaud pipeline (§2.2)? **Yes → EXISTING (Update).** **No → INTERNAL (Skip).**
+    - **2+ deals share the BBID** → **REVIEW** (duplicate deal for the same BBID — edge case 4).
   - **No** → is `Stage` ∈ {Demonstrate, Propose, Negotiate}?
     - **No** (Discover & Access / Engage) → **HOLD** (too early; don't import).
     - **Yes** → Search by **Deal Name (exact)**: `0` → **NEW (Create)**; `1` → **REVIEW (confirm existing)**; `2+` → **REVIEW (ambiguous)**.
@@ -90,7 +92,7 @@ Keep these as a `BB_PIPELINES` constant in code (small + stable; no pipelines ta
 1. **NEW deal** → fill / confirm the ARR amount (most common).
 2. **1 deal-name match, no BBID** → confirm with user; if same deal, treat as existing (and backfill the BBID onto it).
 3. **2+ deal-name matches, no BBID** → confirm with user (pick which, or create new) using created date / amount.
-4. **Duplicate deal for same company (2 BBIDs)** → confirm (usually import both for hygiene).
+4. **Duplicate deal for the same BBID** → the BBID resolves to 2+ HubSpot deals (flagged at classify time) → confirm which is canonical. (Also covers Blackbaud sending two BBIDs for one company — usually import both for hygiene.)
 5. **ABM-vs-Blackbaud source conflict** → confirm source/commission, and whether we even need the BB copy.
 6. **Already a customer** (won / onboarding / in a CS pipeline) but Blackbaud lists it open → confirm (usually skip).
 7. **Data-quality flag** → suspect domain not matching the account (e.g. `broward.org` → Broward County Government, not Broward College) → fix the domain.
